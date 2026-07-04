@@ -1,0 +1,6 @@
+# pnpm build-script allowlist. esbuild needs its native binary; MSW installs a
+# service worker. @scarf is telemetry — deny it.
+allowBuilds:
+  '@scarf/scarf': false
+  esbuild: true
+  msw: true
