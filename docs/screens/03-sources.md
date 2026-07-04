@@ -15,18 +15,18 @@ A **source** is a per-app credential holder that lets a customer's application s
 
 ## Route(s)
 
-| Route | Screen |
-|---|---|
+| Route                  | Screen                                                                    |
+| ---------------------- | ------------------------------------------------------------------------- |
 | `/t/:tenantId/sources` | Sources list + create/rotate/disable actions + instrumentation help panel |
 
 ## Required permission(s)
 
-| Action | Permission |
-|---|---|
-| View sources list | `source:read` |
-| Create source | `source:write` |
-| Rotate key | `source:write` |
-| Disable source | `source:write` |
+| Action            | Permission     |
+| ----------------- | -------------- |
+| View sources list | `source:read`  |
+| Create source     | `source:write` |
+| Rotate key        | `source:write` |
+| Disable source    | `source:write` |
 
 Gate all mutating actions with `<RequirePerm perm="source:write">`; disabled buttons carry a tooltip "requires source:write". Enforcement is also server-side (`403`) — UI gating is UX, not security. See [RBAC](../05-auth-rbac-tenancy.md).
 
@@ -34,24 +34,24 @@ Gate all mutating actions with `<RequirePerm perm="source:write">`; disabled but
 
 All admin routes require `Authorization: Bearer <adminToken>` and are tenant-scoped by the `{tenantID}` path segment.
 
-| Purpose | Method & path | Permission | Notes |
-|---|---|---|---|
-| Create source | `POST /admin/v1/tenants/{tenantID}/sources` | `source:write` | **Returns ingest API key ONCE** (`{ api_key }`, prefix `cdp_`) |
-| Rotate key | `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write` | Returns new key once; **old key invalid immediately** |
-| List sources | **TBD — backend gap** | `source:read` | A `GET /admin/v1/tenants/{tenantID}/sources` is NOT confirmed in the spec. UI needs it to render the table. See [Backend gaps](../10-backend-gaps-and-caveats.md) |
-| Disable source | **TBD — backend gap** | `source:write` | Likely `PUT /admin/v1/tenants/{tenantID}/sources/{sourceID}` (set `status: "disabled"`) but not confirmed in the spec extract. See [Backend gaps](../10-backend-gaps-and-caveats.md) |
+| Purpose        | Method & path                                                     | Permission     | Notes                                                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Create source  | `POST /admin/v1/tenants/{tenantID}/sources`                       | `source:write` | **Returns ingest API key ONCE** (`{ api_key }`, prefix `cdp_`)                                                                                                                       |
+| Rotate key     | `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write` | Returns new key once; **old key invalid immediately**                                                                                                                                |
+| List sources   | **TBD — backend gap**                                             | `source:read`  | A `GET /admin/v1/tenants/{tenantID}/sources` is NOT confirmed in the spec. UI needs it to render the table. See [Backend gaps](../10-backend-gaps-and-caveats.md)                    |
+| Disable source | **TBD — backend gap**                                             | `source:write` | Likely `PUT /admin/v1/tenants/{tenantID}/sources/{sourceID}` (set `status: "disabled"`) but not confirmed in the spec extract. See [Backend gaps](../10-backend-gaps-and-caveats.md) |
 
 > The **list** and **disable** endpoints are unconfirmed. Wire the create/rotate flows against the confirmed endpoints now; stub the list/disable calls behind a thin data-hook so the screen degrades gracefully (empty state / disabled action) until the backend endpoints land.
 
 ### Ingress endpoints (shown as help text only — the console does NOT call these)
 
-| Method & path | Notes |
-|---|---|
-| `POST /v1/events/track` | Single track event → `202` |
-| `POST /v1/identify` | → `202` |
-| `POST /v1/alias` | → `202` |
-| `POST /v1/events/batch` | ≤ 500 events → `202` |
-| `GET /v1/auth/whoami` | → `{tenant_id, source_id}` (source-key context) |
+| Method & path           | Notes                                           |
+| ----------------------- | ----------------------------------------------- |
+| `POST /v1/events/track` | Single track event → `202`                      |
+| `POST /v1/identify`     | → `202`                                         |
+| `POST /v1/alias`        | → `202`                                         |
+| `POST /v1/events/batch` | ≤ 500 events → `202`                            |
+| `GET /v1/auth/whoami`   | → `{tenant_id, source_id}` (source-key context) |
 
 Ingress auth header: `X-CDP-Api-Key: <key>` OR `Authorization: Bearer <key>`; key format `cdp_...`.
 
@@ -60,14 +60,14 @@ Ingress auth header: `X-CDP-Api-Key: <key>` OR `Authorization: Bearer <key>`; ke
 - **PageHeader**: title "Sources", one-line description, primary action **"Create source"** (gated by `source:write`).
 - **MUI X Data Grid** (client-mode paging — the list is filter-only / small, not keyset-paginated):
 
-  | Column | Source field | Rendering |
-  |---|---|---|
-  | Name | `name` | text |
-  | Type | `type` | text (e.g. `"server"`) |
-  | Status | `status` | **StatusChip** — `active` (green) / `disabled` (grey) |
-  | Created | `created_at` | relative-time formatter |
-  | Rate limit | `rate_limit` | number, or "—" when unset |
-  | Actions | — | actions column: **Rotate key**, **Disable** (both gated `source:write`) |
+  | Column     | Source field | Rendering                                                               |
+  | ---------- | ------------ | ----------------------------------------------------------------------- |
+  | Name       | `name`       | text                                                                    |
+  | Type       | `type`       | text (e.g. `"server"`)                                                  |
+  | Status     | `status`     | **StatusChip** — `active` (green) / `disabled` (grey)                   |
+  | Created    | `created_at` | relative-time formatter                                                 |
+  | Rate limit | `rate_limit` | number, or "—" when unset                                               |
+  | Actions    | —            | actions column: **Rotate key**, **Disable** (both gated `source:write`) |
 
 - **Create source dialog** — React Hook Form + Zod (see below).
 - **OneTimeSecretDialog** — reused for the `api_key` returned on create/rotate.
@@ -81,21 +81,30 @@ From [Data model](../07-data-model-and-types.md) — do not redefine, import:
 
 ```ts
 export interface Source {
-  id: string; tenant_id: string; name: string; type: string; // e.g. "server"
-  status: 'active' | 'disabled'; config_json?: Record<string, unknown>;
-  rate_limit?: number; allowed_event_types?: string[]; created_at: string; updated_at: string;
+  id: string;
+  tenant_id: string;
+  name: string;
+  type: string; // e.g. "server"
+  status: 'active' | 'disabled';
+  config_json?: Record<string, unknown>;
+  rate_limit?: number;
+  allowed_event_types?: string[];
+  created_at: string;
+  updated_at: string;
 }
-export interface SourceKeyOnce { api_key: string; } // shown once on create/rotate (prefix cdp_)
+export interface SourceKeyOnce {
+  api_key: string;
+} // shown once on create/rotate (prefix cdp_)
 ```
 
 ## Create form (React Hook Form + Zod)
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `name` | text | yes | human label for the source |
-| `type` | text/select | yes | e.g. `"server"` (free-form string per `Source.type`) |
-| `allowed_event_types` | string[] | no | optional list; restrict which event types this source may send |
-| `rate_limit` | number | no | optional per-source rate hint |
+| Field                 | Type        | Required | Notes                                                          |
+| --------------------- | ----------- | -------- | -------------------------------------------------------------- |
+| `name`                | text        | yes      | human label for the source                                     |
+| `type`                | text/select | yes      | e.g. `"server"` (free-form string per `Source.type`)           |
+| `allowed_event_types` | string[]    | no       | optional list; restrict which event types this source may send |
+| `rate_limit`          | number      | no       | optional per-source rate hint                                  |
 
 ```ts
 const createSourceSchema = z.object({
@@ -126,9 +135,11 @@ Map server `bad_request` (validation) errors to fields or a form-level alert (se
 ## Actions & confirmations
 
 ### Create
+
 Primary action → create dialog → on success → **OneTimeSecretDialog** (copy-once). Covered above.
 
 ### Rotate key
+
 1. Row action **"Rotate key"** → **ConfirmDialog**: warn that **the old key stops working immediately** and any app still using it will start failing (`401` at ingress).
 2. On confirm → `POST .../sources/{sourceID}/rotate-key` → returns `SourceKeyOnce`.
 3. Open **OneTimeSecretDialog** with the new `api_key` (same copy-once warning).
@@ -144,13 +155,17 @@ const rotate = async (sourceId: string) => {
   });
   if (!ok) return;
   const { api_key } = await rotateKey(tenantId, sourceId); // POST .../rotate-key
-  showOneTimeSecret({ title: 'New source API key', value: api_key,
-    warning: 'Copy this key now. It cannot be retrieved again.' });
+  showOneTimeSecret({
+    title: 'New source API key',
+    value: api_key,
+    warning: 'Copy this key now. It cannot be retrieved again.',
+  });
   queryClient.invalidateQueries({ queryKey: qk.sources(tenantId).all });
 };
 ```
 
 ### Disable
+
 Row action **"Disable"** → **ConfirmDialog** → `PUT .../sources/{sourceID}` with `status: "disabled"` **if the endpoint is available**; otherwise render the action disabled with a tooltip and link to [Backend gaps](../10-backend-gaps-and-caveats.md). Mark this path **TBD — backend gap**.
 
 ## Instrumentation help panel
@@ -176,13 +191,13 @@ curl -X POST "$CDP_BASE_URL/v1/events/track" \
 
 ## States (loading / empty / error)
 
-| State | Rendering |
-|---|---|
-| Loading | Data Grid skeleton rows |
-| Empty | `EmptyState` — "No sources yet. Create one to start ingesting events." + primary "Create source" (gated) |
-| Error | `ErrorState` with retry; parse `{error:{code,message}}` envelope |
+| State                 | Rendering                                                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading               | Data Grid skeleton rows                                                                                                                                                            |
+| Empty                 | `EmptyState` — "No sources yet. Create one to start ingesting events." + primary "Create source" (gated)                                                                           |
+| Error                 | `ErrorState` with retry; parse `{error:{code,message}}` envelope                                                                                                                   |
 | List endpoint missing | If `GET .../sources` is unavailable (TBD backend gap), render an informational `EmptyState` explaining the list endpoint is pending backend support; still allow **Create source** |
-| One-time key shown | OneTimeSecretDialog blocks until the operator confirms they copied the value |
+| One-time key shown    | OneTimeSecretDialog blocks until the operator confirms they copied the value                                                                                                       |
 
 ## RBAC & PII notes
 
@@ -204,4 +219,7 @@ curl -X POST "$CDP_BASE_URL/v1/events/track" \
 - [ ] Instrumentation help panel documents ingress endpoints, the `X-CDP-Api-Key` header, the async `202` behavior, and the `X-Api-Key` CORS-mismatch caveat with a link to backend gaps.
 - [ ] Server `bad_request` validation errors are surfaced on the form.
 - [ ] The `api_key` value is never logged, persisted, or re-sent to the API.
+
+```
+
 ```

@@ -3,6 +3,7 @@
 Intended filterable audit trail of admin actions; **currently blocked** on a missing backend read endpoint.
 
 > # 🚫 BLOCKED
+>
 > **The backend audit log is WRITE-ONLY; there is no `GET .../audit` endpoint yet.**
 > This screen **cannot be built** until the backend adds one. The `audit:read` permission string
 > already exists, but no route serves it. The spec below is **forward-looking** — implement the
@@ -24,8 +25,8 @@ placeholder page described in [Placeholder page (build now)](#placeholder-page-b
 
 ## Route(s)
 
-| Route | Screen |
-|---|---|
+| Route                | Screen                                                          |
+| -------------------- | --------------------------------------------------------------- |
 | `/t/:tenantId/audit` | Audit log (placeholder today; full viewer once endpoint exists) |
 
 The route is already reserved in the router tree (see `src/app/router.tsx`). Render it now with the
@@ -33,8 +34,8 @@ blocked banner so the nav item exists and expectations are set.
 
 ## Required permission(s)
 
-| Permission | Used for |
-|---|---|
+| Permission   | Used for                                                                     |
+| ------------ | ---------------------------------------------------------------------------- |
 | `audit:read` | Reading/querying the audit trail (part of the Read set; held by all 6 roles) |
 
 `audit:read` is in the canonical Read set, so **every role** (`SUPER_ADMIN`, `TENANT_ADMIN`,
@@ -46,21 +47,21 @@ exists; the real blocker is the missing route, not RBAC. See [RBAC & auth](../05
 > **None of these exist today.** Do not call them; there is no route to hit. Listed as the
 > **proposed** contract for the backend team.
 
-| Method & path (PROPOSED — does NOT exist) | Perm | Notes |
-|---|---|---|
-| `GET /admin/v1/tenants/{tenantID}/audit` | `audit:read` | List/query audit entries. Filters + pagination below. TBD — backend gap. |
+| Method & path (PROPOSED — does NOT exist) | Perm         | Notes                                                                    |
+| ----------------------------------------- | ------------ | ------------------------------------------------------------------------ |
+| `GET /admin/v1/tenants/{tenantID}/audit`  | `audit:read` | List/query audit entries. Filters + pagination below. TBD — backend gap. |
 
 ### Proposed query parameters
 
-| Param | Type | Meaning |
-|---|---|---|
-| `actor` | string | Filter by `actor_id` / `actor_type` (see caveat: `actor_id` unpopulated → coarse). |
-| `action` | string | Filter by action verb (e.g. `create`, `update`, `delete`, `retry`, `export`). |
-| `resource_type` | string | Filter by resource (e.g. `tenant`, `source`, `admin_token`, `segment`, `destination`, `subscription`, `consent`, `dlq_event`, `profile`). |
-| `from` | RFC3339 string | Start of `created_at` range (inclusive). |
-| `to` | RFC3339 string | End of `created_at` range (inclusive). |
-| `limit` | int | Page size. Pagination style TBD — likely **keyset/cursor** to match `GET .../events`. |
-| `cursor` | string | Opaque cursor if keyset. TBD — backend gap; confirm shape. |
+| Param           | Type           | Meaning                                                                                                                                   |
+| --------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `actor`         | string         | Filter by `actor_id` / `actor_type` (see caveat: `actor_id` unpopulated → coarse).                                                        |
+| `action`        | string         | Filter by action verb (e.g. `create`, `update`, `delete`, `retry`, `export`).                                                             |
+| `resource_type` | string         | Filter by resource (e.g. `tenant`, `source`, `admin_token`, `segment`, `destination`, `subscription`, `consent`, `dlq_event`, `profile`). |
+| `from`          | RFC3339 string | Start of `created_at` range (inclusive).                                                                                                  |
+| `to`            | RFC3339 string | End of `created_at` range (inclusive).                                                                                                    |
+| `limit`         | int            | Page size. Pagination style TBD — likely **keyset/cursor** to match `GET .../events`.                                                     |
+| `cursor`        | string         | Opaque cursor if keyset. TBD — backend gap; confirm shape.                                                                                |
 
 Pagination shape is **unconfirmed**. If the backend follows the events convention it returns
 `{ entries: [...], next_cursor: string }` and the Data Grid runs in server mode. Confirm on
@@ -81,16 +82,16 @@ Once the endpoint exists, build a standard data-dense list view:
 
 ### Intended table columns
 
-| Column | Source field | Notes |
-|---|---|---|
-| Time | `created_at` | Relative-time formatter + absolute on hover. Default sort `created_at DESC` (assumed). |
-| Actor | `actor_type` / `actor_id` | Show `actor_type`; `actor_id` often empty → attribution is coarse (see caveat). |
-| Action | `action` | e.g. `create`, `update`, `delete`, `retry`, `discard`, `export`, `view`. |
-| Resource type | `resource_type` | e.g. `segment`, `destination`, `consent`, `dlq_event`, `profile`. |
-| Resource ID | `resource_id` | Copyable via `CopyButton`. |
-| IP | `ip_address` | Optional; may be empty. |
-| User agent | `user_agent` | Optional; truncate with tooltip. |
-| Diff | `before_json` / `after_json` | Actions column → opens `JsonViewer` diff drawer. |
+| Column        | Source field                 | Notes                                                                                  |
+| ------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
+| Time          | `created_at`                 | Relative-time formatter + absolute on hover. Default sort `created_at DESC` (assumed). |
+| Actor         | `actor_type` / `actor_id`    | Show `actor_type`; `actor_id` often empty → attribution is coarse (see caveat).        |
+| Action        | `action`                     | e.g. `create`, `update`, `delete`, `retry`, `discard`, `export`, `view`.               |
+| Resource type | `resource_type`              | e.g. `segment`, `destination`, `consent`, `dlq_event`, `profile`.                      |
+| Resource ID   | `resource_id`                | Copyable via `CopyButton`.                                                             |
+| IP            | `ip_address`                 | Optional; may be empty.                                                                |
+| User agent    | `user_agent`                 | Optional; truncate with tooltip.                                                       |
+| Diff          | `before_json` / `after_json` | Actions column → opens `JsonViewer` diff drawer.                                       |
 
 ## Data & TS types
 
@@ -100,13 +101,13 @@ Use the canonical `AuditLogEntry` from [Data model & types](../07-data-model-and
 export interface AuditLogEntry {
   id: string;
   tenant_id: string;
-  actor_id?: string;      // often unpopulated → coarse attribution
+  actor_id?: string; // often unpopulated → coarse attribution
   actor_type: string;
   action: string;
   resource_type: string;
   resource_id: string;
-  before_json?: unknown;  // diff "before"
-  after_json?: unknown;   // diff "after"
+  before_json?: unknown; // diff "before"
+  after_json?: unknown; // diff "after"
   ip_address?: string;
   user_agent?: string;
   created_at: string;
@@ -126,11 +127,7 @@ interface AuditPage {
 `JsonViewer` diff usage sketch (illustrative):
 
 ```tsx
-<JsonViewer
-  mode="diff"
-  before={entry.before_json}
-  after={entry.after_json}
-/>
+<JsonViewer mode="diff" before={entry.before_json} after={entry.after_json} />
 ```
 
 ## States (loading / empty / error)
@@ -176,8 +173,8 @@ export function AuditLogPage() {
         <AlertTitle>Blocked — backend endpoint missing</AlertTitle>
         The audit log is currently <strong>write-only</strong>. There is no
         <code> GET /admin/v1/tenants/{'{tenantID}'}/audit </code> endpoint yet, so this screen
-        cannot be built. This is a Phase 2 feature pending a backend read route.
-        See docs/10-backend-gaps-and-caveats.md.
+        cannot be built. This is a Phase 2 feature pending a backend read route. See
+        docs/10-backend-gaps-and-caveats.md.
       </Alert>
     </>
   );
@@ -191,12 +188,14 @@ is precise. Track under [Backend gaps & caveats](../10-backend-gaps-and-caveats.
 ## Acceptance criteria (checklist)
 
 **Now (placeholder — must pass today):**
+
 - [ ] `/t/:tenantId/audit` route renders the placeholder page with the prominent blocked/warning banner.
 - [ ] Banner states the log is write-only, that `GET .../audit` does not exist, and links to `docs/10-backend-gaps-and-caveats.md`.
 - [ ] No API call is made (no request to a non-existent audit endpoint).
 - [ ] Nav item for Audit Log is visible (optionally marked "Phase 2").
 
 **Later (gated on backend endpoint — do NOT attempt until `GET .../audit` ships):**
+
 - [ ] Backend `GET /admin/v1/tenants/{tenantID}/audit` (perm `audit:read`) exists and is confirmed in `openapi.yaml`.
 - [ ] Filters wired: `actor`, `action`, `resource_type`, date range (`from`/`to`), pagination (`limit`/`cursor` per confirmed shape).
 - [ ] Data Grid renders columns: `created_at`, actor (`actor_type`/`actor_id`), `action`, `resource_type`, `resource_id`, `ip_address`, `user_agent`.

@@ -22,7 +22,7 @@ const shared: ThemeOptions = {
   shape: { borderRadius: 6 },
   typography: {
     fontFamily: `Inter, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif`,
-    fontSize: 13,               // denser than MUI's 14 default
+    fontSize: 13, // denser than MUI's 14 default
     h1: { fontSize: '1.6rem', fontWeight: 600 },
     h2: { fontSize: '1.3rem', fontWeight: 600 },
     h3: { fontSize: '1.1rem', fontWeight: 600 },
@@ -43,8 +43,8 @@ export const buildTheme = (mode: 'light' | 'dark') =>
             background: { default: '#f6f7f9', paper: '#ffffff' },
             success: { main: '#2e7d32' }, // active / succeeded
             warning: { main: '#ed6c02' }, // pending
-            error:   { main: '#d32f2f' }, // denied / failed_* / dlq
-            grey:    { 500: '#9e9e9e' },  // disabled / skipped
+            error: { main: '#d32f2f' }, // denied / failed_* / dlq
+            grey: { 500: '#9e9e9e' }, // disabled / skipped
           }
         : {
             mode: 'dark',
@@ -52,8 +52,8 @@ export const buildTheme = (mode: 'light' | 'dark') =>
             background: { default: '#0f1115', paper: '#161a20' },
             success: { main: '#66bb6a' },
             warning: { main: '#ffa726' },
-            error:   { main: '#f44336' },
-            grey:    { 500: '#8a8f98' },
+            error: { main: '#f44336' },
+            grey: { 500: '#8a8f98' },
           },
     components: componentDefaults, // see §1.3
   });
@@ -69,12 +69,12 @@ export const buildTheme = (mode: 'light' | 'dark') =>
 
 ```ts
 const componentDefaults = {
-  MuiButton:    { defaultProps: { size: 'small', disableElevation: true } },
+  MuiButton: { defaultProps: { size: 'small', disableElevation: true } },
   MuiTextField: { defaultProps: { size: 'small', margin: 'dense', fullWidth: true } },
-  MuiSelect:    { defaultProps: { size: 'small' } },
-  MuiChip:      { defaultProps: { size: 'small' } },
-  MuiTooltip:   { defaultProps: { arrow: true } },
-  MuiTable:     { defaultProps: { size: 'small' } },
+  MuiSelect: { defaultProps: { size: 'small' } },
+  MuiChip: { defaultProps: { size: 'small' } },
+  MuiTooltip: { defaultProps: { arrow: true } },
+  MuiTable: { defaultProps: { size: 'small' } },
   // Data Grid defaults live where the grid wrapper is defined (§3.3):
   // density: 'compact', disableRowSelectionOnClick: true, pageSizeOptions: [25, 50, 100]
 } as const;
@@ -119,17 +119,17 @@ Layout route for `/t/:tenantId`. Renders the nav rail, top bar, breadcrumb, and 
 
 One entry per feature, each with an `@mui/icons-material` icon + label, gated by the current role's permissions (computed from the role→permission table in [API integration](04-api-integration.md) / auth lib). Hide (do not merely disable) items the role can never use.
 
-| Nav item | Route | Icon (suggested) | Gate (permission) |
-|---|---|---|---|
-| Dashboard | `/t/:tenantId/dashboard` | `Dashboard` | none (any valid token) |
-| Sources | `/t/:tenantId/sources` | `Sensors` | `source:read` |
-| Events | `/t/:tenantId/events` | `Timeline` | `event:read` |
-| Profiles | `/t/:tenantId/profiles` | `Person` | `profile:read` |
-| Segments | `/t/:tenantId/segments` | `GroupWork` | `segment:read` |
-| Destinations | `/t/:tenantId/destinations` | `CallSplit` | `destination:read` |
-| DLQ | `/t/:tenantId/dlq` | `Warning` | `dlq:read` |
-| Audit | `/t/:tenantId/audit` | `History` | `audit:read` (Phase 2 — see [gaps](10-backend-gaps-and-caveats.md)) |
-| Administration | `/t/:tenantId/administration` | `AdminPanelSettings` | `admin:write` |
+| Nav item       | Route                         | Icon (suggested)     | Gate (permission)                                                   |
+| -------------- | ----------------------------- | -------------------- | ------------------------------------------------------------------- |
+| Dashboard      | `/t/:tenantId/dashboard`      | `Dashboard`          | none (any valid token)                                              |
+| Sources        | `/t/:tenantId/sources`        | `Sensors`            | `source:read`                                                       |
+| Events         | `/t/:tenantId/events`         | `Timeline`           | `event:read`                                                        |
+| Profiles       | `/t/:tenantId/profiles`       | `Person`             | `profile:read`                                                      |
+| Segments       | `/t/:tenantId/segments`       | `GroupWork`          | `segment:read`                                                      |
+| Destinations   | `/t/:tenantId/destinations`   | `CallSplit`          | `destination:read`                                                  |
+| DLQ            | `/t/:tenantId/dlq`            | `Warning`            | `dlq:read`                                                          |
+| Audit          | `/t/:tenantId/audit`          | `History`            | `audit:read` (Phase 2 — see [gaps](10-backend-gaps-and-caveats.md)) |
+| Administration | `/t/:tenantId/administration` | `AdminPanelSettings` | `admin:write`                                                       |
 
 - Active route highlighted. Rail is collapsible to icons-only (persist collapse state in `localStorage`).
 - Audit item is shown but leads to a "blocked on backend endpoint" banner ([gaps](10-backend-gaps-and-caveats.md)).
@@ -171,26 +171,28 @@ Behavior: `h1` title, muted `body2` description, right-aligned `actions`. Wrap w
 Maps a status enum value to an MUI `Chip` color. Single source of truth for status colors across the app.
 
 ```tsx
-interface StatusChipProps { status: string; }
+interface StatusChipProps {
+  status: string;
+}
 ```
 
-| Status value | Color | Applies to |
-|---|---|---|
-| `active` | success (green) | Tenant, Source, AdminToken, Destination, Segment |
-| `succeeded` | success (green) | activation task |
-| `granted` | success (green) | consent |
-| `disabled` | grey | Source, Destination |
-| `skipped` | grey | activation task (consent_denied) |
-| `unknown` | grey | consent |
-| `pending` | warning (amber) | activation task |
-| `sending` | warning (amber) | activation task |
-| `denied` | error (red) | consent |
-| `failed_retryable` | error (red) | activation task |
-| `failed_permanent` | error (red) | activation task |
-| `dlq` | error (red) | activation task |
-| `open` | warning (amber) | DLQ event |
-| `retried` | success (green) | DLQ event |
-| `discarded` | grey | DLQ event |
+| Status value       | Color           | Applies to                                       |
+| ------------------ | --------------- | ------------------------------------------------ |
+| `active`           | success (green) | Tenant, Source, AdminToken, Destination, Segment |
+| `succeeded`        | success (green) | activation task                                  |
+| `granted`          | success (green) | consent                                          |
+| `disabled`         | grey            | Source, Destination                              |
+| `skipped`          | grey            | activation task (consent_denied)                 |
+| `unknown`          | grey            | consent                                          |
+| `pending`          | warning (amber) | activation task                                  |
+| `sending`          | warning (amber) | activation task                                  |
+| `denied`           | error (red)     | consent                                          |
+| `failed_retryable` | error (red)     | activation task                                  |
+| `failed_permanent` | error (red)     | activation task                                  |
+| `dlq`              | error (red)     | activation task                                  |
+| `open`             | warning (amber) | DLQ event                                        |
+| `retried`          | success (green) | DLQ event                                        |
+| `discarded`        | grey            | DLQ event                                        |
 
 - Use a lookup map; unknown/unmapped values fall back to a `default` grey chip and render the raw string (never crash on an unexpected status).
 - Enum values must match [Data model & types](07-data-model-and-types.md) exactly (`ActivationTaskStatus`, `DlqStatus`, `ConsentStatus`, entity `status`).
@@ -207,12 +209,12 @@ interface AppDataGridProps<Row> {
   mode: 'server' | 'client';
   // server (keyset/cursor) mode — ONLY the events list:
   hasNextPage?: boolean;
-  onLoadMore?: () => void;          // fetch next cursor page
+  onLoadMore?: () => void; // fetch next cursor page
   // client (filter-only) mode — profiles, dlq, segment members, deliveries, consent:
   getRowId?: (row: Row) => string;
-  emptyState?: React.ReactNode;     // renders EmptyState when rows.length === 0
+  emptyState?: React.ReactNode; // renders EmptyState when rows.length === 0
   error?: unknown;
-  onRetry?: () => void;             // renders ErrorState with retry
+  onRetry?: () => void; // renders ErrorState with retry
 }
 ```
 
@@ -222,12 +224,12 @@ interface AppDataGridProps<Row> {
 
 **Common column helpers** (exported factories):
 
-| Helper | Renders |
-|---|---|
-| `idColumn(field)` | monospace, truncated, with inline `CopyButton` (copyable id) |
-| `statusColumn(field)` | `StatusChip` |
+| Helper                      | Renders                                                         |
+| --------------------------- | --------------------------------------------------------------- |
+| `idColumn(field)`           | monospace, truncated, with inline `CopyButton` (copyable id)    |
+| `statusColumn(field)`       | `StatusChip`                                                    |
 | `relativeTimeColumn(field)` | relative-time via formatter (see below), tooltip = absolute ISO |
-| `actionsColumn(getActions)` | `type: 'actions'`, perm-gated `GridActionsCellItem`s |
+| `actionsColumn(getActions)` | `type: 'actions'`, perm-gated `GridActionsCellItem`s            |
 
 **Relative-time formatter** (`lib/format`): renders `"3m ago"`, `"2h ago"`, `"5d ago"` from an ISO timestamp; tooltip shows full absolute time. Used in every timestamp column and in list items.
 
@@ -238,14 +240,15 @@ Shows a plaintext secret returned exactly once. Reused for **source API keys** (
 ```tsx
 interface OneTimeSecretDialogProps {
   open: boolean;
-  title: string;              // e.g. "Source API key created"
-  secret: string;            // the plaintext value
-  helperText?: string;       // e.g. "Give this key to the source's engineers."
-  onClose: () => void;       // only enabled after confirm-to-close
+  title: string; // e.g. "Source API key created"
+  secret: string; // the plaintext value
+  helperText?: string; // e.g. "Give this key to the source's engineers."
+  onClose: () => void; // only enabled after confirm-to-close
 }
 ```
 
 Behavior:
+
 - Prominent read-only field with the secret + a large `CopyButton`.
 - A **warning banner**: "This value is shown once and cannot be retrieved again. Copy it now." (severity `warning`).
 - **Confirm-to-close**: a required checkbox "I have copied and stored this value" that enables the Close button. Do not allow backdrop/escape dismissal until confirmed.
@@ -260,14 +263,14 @@ interface ConfirmDialogProps {
   open: boolean;
   title: string;
   body: React.ReactNode;
-  confirmLabel?: string;            // default "Confirm"
-  destructive?: boolean;           // red confirm button
+  confirmLabel?: string; // default "Confirm"
+  destructive?: boolean; // red confirm button
   // Typed-confirmation variant (GDPR delete):
-  confirmToken?: string;           // e.g. the canonical_user_id
-  confirmTokenLabel?: string;      // "Type the canonical_user_id to confirm"
+  confirmToken?: string; // e.g. the canonical_user_id
+  confirmTokenLabel?: string; // "Type the canonical_user_id to confirm"
   onConfirm: () => void;
   onCancel: () => void;
-  loading?: boolean;               // disable buttons while mutation pending
+  loading?: boolean; // disable buttons while mutation pending
 }
 ```
 
@@ -281,8 +284,8 @@ Collapsible viewer for event payloads (`payload_json`), DLQ `original_payload`, 
 ```tsx
 interface JsonViewerProps {
   value: unknown;
-  collapsed?: boolean | number;   // default collapse to depth 1
-  maxHeight?: number;             // scroll beyond this
+  collapsed?: boolean | number; // default collapse to depth 1
+  maxHeight?: number; // scroll beyond this
 }
 ```
 
@@ -292,15 +295,25 @@ interface JsonViewerProps {
 ### 3.7 `EmptyState`
 
 ```tsx
-interface EmptyStateProps { icon?: React.ReactNode; title: string; description?: string; action?: React.ReactNode; }
+interface EmptyStateProps {
+  icon?: React.ReactNode;
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}
 ```
+
 Centered, muted. Every list/table shows this when there are zero rows (e.g. "No sources yet — create one to start ingesting events").
 
 ### 3.8 `ErrorState`
 
 ```tsx
-interface ErrorStateProps { error: unknown; onRetry?: () => void; }
+interface ErrorStateProps {
+  error: unknown;
+  onRetry?: () => void;
+}
 ```
+
 - Parses the API error envelope `{ error: { code, message } }` ([Data model & types](07-data-model-and-types.md)) and shows a human message. Renders a **Retry** button when `onRetry` is provided (re-runs the query).
 - Distinguish `403` (permission/tenant-scope) with guidance rather than a generic failure.
 
@@ -311,8 +324,13 @@ MUI `Skeleton` compositions matching the target layout: `TableSkeleton` (rows ×
 ### 3.10 `CopyButton`
 
 ```tsx
-interface CopyButtonProps { value: string; label?: string; size?: 'small' | 'medium'; }
+interface CopyButtonProps {
+  value: string;
+  label?: string;
+  size?: 'small' | 'medium';
+}
 ```
+
 Copies `value` to clipboard, shows a transient "Copied" tooltip/toast. Used inline in id columns, the secret dialog, JSON viewer, and instrumentation help.
 
 ### 3.11 `StatusChip` color map is authoritative
@@ -325,7 +343,10 @@ Any new status introduced by the backend must be added to §3.2's map, not color
 - When an action should be visible-but-disabled, wrap the disabled control in `PermissionTooltip` with text **"requires `<perm>`"** (e.g. "requires `dlq:retry`"). Permission strings must match [Data model & types](07-data-model-and-types.md) `Permission`.
 
 ```tsx
-interface PermissionTooltipProps { perm: Permission; children: React.ReactElement; }
+interface PermissionTooltipProps {
+  perm: Permission;
+  children: React.ReactElement;
+}
 // tooltip text: `requires ${perm}`
 ```
 
@@ -340,7 +361,7 @@ Gating is UX only — the server also enforces (403). See [API integration](04-a
 ```tsx
 const q = useSomething(tenantId);
 if (q.isPending) return <TableSkeleton rows={8} />;
-if (q.isError)   return <ErrorState error={q.error} onRetry={q.refetch} />;
+if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
 if (!q.data?.length) return <EmptyState title="Nothing here yet" action={<CreateButton />} />;
 return <AppDataGrid mode="client" rows={q.data} columns={cols} />;
 ```
@@ -354,7 +375,9 @@ The `AppDataGrid` wrapper (§3.3) accepts `loading`, `error`, `onRetry`, and `em
 The pipeline is **asynchronous** — ingest/replay returns `202` and identity → profile → segmentation → activation happen seconds later. After any ingest-affecting or replay action (e.g. `POST .../events/{eventID}/replay`, `POST .../replay`, DLQ retry), show a non-blocking banner and a manual refresh.
 
 ```tsx
-interface ProcessingBannerProps { onRefresh: () => void; }
+interface ProcessingBannerProps {
+  onRefresh: () => void;
+}
 // copy: "Processing — data may take a few seconds. Refresh to see updates."
 ```
 
@@ -369,11 +392,11 @@ interface ProcessingBannerProps { onRefresh: () => void; }
 
 Single `SnackbarProvider` at the app root. Use a small `useToast()` wrapper over `useSnackbar`.
 
-| Kind | Variant | When |
-|---|---|---|
-| success | `success` | mutation succeeded (e.g. "Source created", "DLQ event retried") |
-| error | `error` | mutation/query error surfaced from the error interceptor (message from `error.message`) |
-| info | `info` | non-blocking notices (e.g. "Copied", processing hints not shown as a banner) |
+| Kind    | Variant   | When                                                                                    |
+| ------- | --------- | --------------------------------------------------------------------------------------- |
+| success | `success` | mutation succeeded (e.g. "Source created", "DLQ event retried")                         |
+| error   | `error`   | mutation/query error surfaced from the error interceptor (message from `error.message`) |
+| info    | `info`    | non-blocking notices (e.g. "Copied", processing hints not shown as a banner)            |
 
 - Central Axios error interceptor drives error toasts (except `401` → redirect to `/connect`, and `429` → respect `Retry-After`). See [API integration](04-api-integration.md).
 - Keep messages short; include the server `error.message` when present.
@@ -389,8 +412,9 @@ Forms use **React Hook Form + Zod** (`@hookform/resolvers`).
 ```tsx
 const form = useForm({ resolver: zodResolver(schema) });
 const onSubmit = form.handleSubmit(async (values) => {
-  try { await mutate(values); }
-  catch (e) {
+  try {
+    await mutate(values);
+  } catch (e) {
     const api = parseApiError(e); // { code, message }
     if (api?.code === 'bad_request') setFormError(api.message); // top-level Alert
   }

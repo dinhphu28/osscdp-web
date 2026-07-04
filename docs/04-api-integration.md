@@ -16,9 +16,9 @@ There is **one server on one port**. Ingress and admin surfaces are split by URL
 
 Base URL comes from the Vite env var `VITE_API_BASE_URL`:
 
-| Deployment | `VITE_API_BASE_URL` |
-|---|---|
-| Local dev (backend run directly) | `http://localhost:8080` |
+| Deployment                                    | `VITE_API_BASE_URL`      |
+| --------------------------------------------- | ------------------------ |
+| Local dev (backend run directly)              | `http://localhost:8080`  |
 | Docker `stack-up` (OpenAPI spec's server URL) | `http://localhost:18080` |
 
 The value is read once at startup and may be overridden per-session from the `/connect` screen (base URL override, useful when the operator points the console at a non-default deployment). No client secrets live in env — the admin token is entered at runtime.
@@ -41,7 +41,7 @@ import { getToken, getBaseUrl } from '../auth/tokenStore';
 export const api = axios.create();
 
 api.interceptors.request.use((config) => {
-  config.baseURL = getBaseUrl();            // VITE_API_BASE_URL or /connect override
+  config.baseURL = getBaseUrl(); // VITE_API_BASE_URL or /connect override
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
@@ -79,97 +79,97 @@ All paths below are relative to `VITE_API_BASE_URL`. All `/admin/v1/*` routes re
 
 ### 4.1 Health / meta (unauthenticated)
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/healthz` | Liveness |
-| GET | `/readyz` | Readiness (DB ping) |
-| GET | `/metrics` | Prometheus **text** (not JSON) — dashboard links/embeds Grafana, does not parse this |
-| GET | `/openapi.yaml` | Raw spec (Orval codegen source) |
-| GET | `/docs` | Redoc |
+| Method | Path            | Purpose                                                                              |
+| ------ | --------------- | ------------------------------------------------------------------------------------ |
+| GET    | `/healthz`      | Liveness                                                                             |
+| GET    | `/readyz`       | Readiness (DB ping)                                                                  |
+| GET    | `/metrics`      | Prometheus **text** (not JSON) — dashboard links/embeds Grafana, does not parse this |
+| GET    | `/openapi.yaml` | Raw spec (Orval codegen source)                                                      |
+| GET    | `/docs`         | Redoc                                                                                |
 
 ### 4.2 Tenants & Sources
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| POST | `/admin/v1/tenants` | **SUPER_ADMIN only** | Create tenant; body `{name}` → `{id,name,status,created_at,updated_at}` |
-| POST | `/admin/v1/tenants/{tenantID}/sources` | `source:write` | Create source; **returns ingest API key ONCE** (`SourceKeyOnce`, prefix `cdp_`) |
-| POST | `/admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write` | Rotate key (old key invalid immediately); returns new key once |
+| Method | Path                                                         | Permission           | Purpose                                                                         |
+| ------ | ------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------- |
+| POST   | `/admin/v1/tenants`                                          | **SUPER_ADMIN only** | Create tenant; body `{name}` → `{id,name,status,created_at,updated_at}`         |
+| POST   | `/admin/v1/tenants/{tenantID}/sources`                       | `source:write`       | Create source; **returns ingest API key ONCE** (`SourceKeyOnce`, prefix `cdp_`) |
+| POST   | `/admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write`       | Rotate key (old key invalid immediately); returns new key once                  |
 
 > There is no confirmed "list tenants" / "list sources" endpoint in the spec extract for these — mark **TBD — backend gap**; see [Backend gaps & caveats](10-backend-gaps-and-caveats.md).
 
 ### 4.3 Admin tokens
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| POST | `/admin/v1/admin-tokens` | `admin:write` | Mint token; body `{name, role, tenant_id}` → `{api_token, role}` (**plaintext `cdpadm_...` shown ONCE**, `AdminTokenOnce`). SUPER_ADMIN mints any role/tenant; TENANT_ADMIN mints only non-super roles for its own tenant |
+| Method | Path                     | Permission    | Purpose                                                                                                                                                                                                                   |
+| ------ | ------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/admin/v1/admin-tokens` | `admin:write` | Mint token; body `{name, role, tenant_id}` → `{api_token, role}` (**plaintext `cdpadm_...` shown ONCE**, `AdminTokenOnce`). SUPER_ADMIN mints any role/tenant; TENANT_ADMIN mints only non-super roles for its own tenant |
 
 ### 4.4 Raw events
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| GET | `/admin/v1/tenants/{tenantID}/events` | `event:read` | **Keyset pagination**. Query: `limit` (default 50, max 500), `cursor` (opaque), filters `identifier_key` (e.g. `user_id:u1`), `event_name`. Response `{events:[...], next_cursor:string}` (`KeysetPage<RawEvent>`) |
-| GET | `/admin/v1/tenants/{tenantID}/events/{eventID}` | `event:read` | Single raw event |
-| POST | `/admin/v1/tenants/{tenantID}/events/{eventID}/replay` | `event:replay` | Replay one event |
-| POST | `/admin/v1/tenants/{tenantID}/replay?identifier_key=...&max=1000` | `event:replay` | Replay all events for an identifier |
+| Method | Path                                                              | Permission     | Purpose                                                                                                                                                                                                            |
+| ------ | ----------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/admin/v1/tenants/{tenantID}/events`                             | `event:read`   | **Keyset pagination**. Query: `limit` (default 50, max 500), `cursor` (opaque), filters `identifier_key` (e.g. `user_id:u1`), `event_name`. Response `{events:[...], next_cursor:string}` (`KeysetPage<RawEvent>`) |
+| GET    | `/admin/v1/tenants/{tenantID}/events/{eventID}`                   | `event:read`   | Single raw event                                                                                                                                                                                                   |
+| POST   | `/admin/v1/tenants/{tenantID}/events/{eventID}/replay`            | `event:replay` | Replay one event                                                                                                                                                                                                   |
+| POST   | `/admin/v1/tenants/{tenantID}/replay?identifier_key=...&max=1000` | `event:replay` | Replay all events for an identifier                                                                                                                                                                                |
 
 ### 4.5 Profiles
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| GET | `/admin/v1/tenants/{tenantID}/profiles?email=...` or `?phone=...` | `profile:read` | Search by email OR phone (`400 bad_request` if neither) |
-| GET | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}` | `profile:read` | Profile detail (`CustomerProfile`; traits PII-masked unless `pii:read`) |
-| GET | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/identifiers` | `profile:read` | `{canonical_user_id, total, by_namespace, values}` (values masked unless `pii:read`) |
+| Method | Path                                                                  | Permission     | Purpose                                                                              |
+| ------ | --------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------ |
+| GET    | `/admin/v1/tenants/{tenantID}/profiles?email=...` or `?phone=...`     | `profile:read` | Search by email OR phone (`400 bad_request` if neither)                              |
+| GET    | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}`             | `profile:read` | Profile detail (`CustomerProfile`; traits PII-masked unless `pii:read`)              |
+| GET    | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/identifiers` | `profile:read` | `{canonical_user_id, total, by_namespace, values}` (values masked unless `pii:read`) |
 
 > Per-profile sub-resources (identity-cluster, events-by-profile, segment-memberships-by-profile) are addressed under the profile; where the exact endpoint is not in the spec, mark **TBD — backend gap**.
 
 ### 4.6 Consent (per canonicalUserID)
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| PUT | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/consent` | `consent:write` | Set consent; body `{channel, purpose, status, source?}` → `{status:"ok"}` |
-| GET | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/consent` | `profile:read` | `{consent:[{channel,purpose,status,source,updated_at}]}` |
+| Method | Path                                                              | Permission      | Purpose                                                                   |
+| ------ | ----------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
+| PUT    | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/consent` | `consent:write` | Set consent; body `{channel, purpose, status, source?}` → `{status:"ok"}` |
+| GET    | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/consent` | `profile:read`  | `{consent:[{channel,purpose,status,source,updated_at}]}`                  |
 
 Channels: `email, sms, push, ads, webhook`. Purposes: `marketing, analytics, personalization, transactional`. Statuses: `granted, denied, unknown` (absence = unknown). Activation skips `denied` (task status `skipped`).
 
 ### 4.7 Governance / GDPR (per canonicalUserID)
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| GET | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/export` | `profile:read` | Bundle `{profile, identity_nodes:[{namespace,value_hash}], segment_memberships:[{segment_id,status}], consent:[...]}` |
-| DELETE | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}` | `profile:delete` | `{deleted:{<table>:count}}` (audited; requires confirm flow — type the `canonical_user_id`) |
+| Method | Path                                                             | Permission       | Purpose                                                                                                               |
+| ------ | ---------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}/export` | `profile:read`   | Bundle `{profile, identity_nodes:[{namespace,value_hash}], segment_memberships:[{segment_id,status}], consent:[...]}` |
+| DELETE | `/admin/v1/tenants/{tenantID}/profiles/{canonicalUserID}`        | `profile:delete` | `{deleted:{<table>:count}}` (audited; requires confirm flow — type the `canonical_user_id`)                           |
 
 ### 4.8 Segments
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| POST | `/admin/v1/tenants/{tenantID}/segments` | `segment:write` | Create; body `{name, description?, rule}` → `201 Segment` |
-| PUT | `/admin/v1/tenants/{tenantID}/segments/{segmentID}` | `segment:write` | Edit (creates a **new version**) |
-| DELETE | `/admin/v1/tenants/{tenantID}/segments/{segmentID}` | `segment:write` | Deactivate. **Code-only, NOT in openapi.yaml** — Orval won't generate it; hand-write. See gap #5 |
-| GET | `/admin/v1/tenants/{tenantID}/segments/{segmentID}` | `segment:read` | Segment detail |
-| GET | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/members` | `segment:read` | Active members (no paging params — full array) |
-| GET | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/destinations` | `destination:read` | Destinations wired to this segment |
-| GET | `/admin/v1/tenants/{tenantID}/segments` | `segment:read` | **TBD — backend gap.** No "list all segments" endpoint confirmed in the spec extract; UI needs it. See gap #7 |
+| Method | Path                                                             | Permission         | Purpose                                                                                                       |
+| ------ | ---------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| POST   | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:write`    | Create; body `{name, description?, rule}` → `201 Segment`                                                     |
+| PUT    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}`              | `segment:write`    | Edit (creates a **new version**)                                                                              |
+| DELETE | `/admin/v1/tenants/{tenantID}/segments/{segmentID}`              | `segment:write`    | Deactivate. **Code-only, NOT in openapi.yaml** — Orval won't generate it; hand-write. See gap #5              |
+| GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}`              | `segment:read`     | Segment detail                                                                                                |
+| GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/members`      | `segment:read`     | Active members (no paging params — full array)                                                                |
+| GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/destinations` | `destination:read` | Destinations wired to this segment                                                                            |
+| GET    | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:read`     | **TBD — backend gap.** No "list all segments" endpoint confirmed in the spec extract; UI needs it. See gap #7 |
 
 ### 4.9 Destinations / Activation
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| POST | `/admin/v1/tenants/{tenantID}/destinations` | `destination:write` | Create; body `{type:"webhook"\|"kafka", name, secret?, channel?, purpose?, config}` → `201` (secret never returned) |
-| GET | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}` | `destination:read` | Destination detail |
-| PUT | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}` | `destination:write` | Update (e.g. disable) |
-| POST | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/subscriptions` | `destination:write` | `{trigger_type:"segment_membership", segment_id}` |
-| DELETE | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/subscriptions/{subscriptionID}` | `destination:write` | Soft-disable subscription (idempotent) |
-| GET | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/deliveries` | `activation:read` | Delivery attempts (full array) |
+| Method | Path                                                                                       | Permission          | Purpose                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/admin/v1/tenants/{tenantID}/destinations`                                                | `destination:write` | Create; body `{type:"webhook"\|"kafka", name, secret?, channel?, purpose?, config}` → `201` (secret never returned) |
+| GET    | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}`                                | `destination:read`  | Destination detail                                                                                                  |
+| PUT    | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}`                                | `destination:write` | Update (e.g. disable)                                                                                               |
+| POST   | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/subscriptions`                  | `destination:write` | `{trigger_type:"segment_membership", segment_id}`                                                                   |
+| DELETE | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/subscriptions/{subscriptionID}` | `destination:write` | Soft-disable subscription (idempotent)                                                                              |
+| GET    | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/deliveries`                     | `activation:read`   | Delivery attempts (full array)                                                                                      |
 
 Webhook `config`: `{url, method?, headers?{}, timeout_ms?, max_retries?}` + top-level `secret` (HMAC). Kafka `config`: `{topic}`. Implemented types: **webhook, kafka**. Declared-but-deferred (render disabled / "coming soon"): `push, email, crm, ads, warehouse`. Task statuses: `pending, sending, succeeded, failed_retryable, failed_permanent, dlq, skipped` (`skipped` = consent denied).
 
 ### 4.10 DLQ
 
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| GET | `/admin/v1/tenants/{tenantID}/dlq?status=open\|retried\|discarded` | `dlq:read` | `{events:[...]}`, default limit 100 (max 500), `failed_at DESC`. Item = `DlqEvent` |
-| POST | `/admin/v1/tenants/{tenantID}/dlq/{id}/retry` | `dlq:retry` | Republish → `{id,status:"retried"}` |
-| POST | `/admin/v1/tenants/{tenantID}/dlq/{id}/discard` | `dlq:retry` | Discard → `{id,status:"discarded"}` (**note: discard shares the `dlq:retry` permission**) |
+| Method | Path                                                               | Permission  | Purpose                                                                                   |
+| ------ | ------------------------------------------------------------------ | ----------- | ----------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/tenants/{tenantID}/dlq?status=open\|retried\|discarded` | `dlq:read`  | `{events:[...]}`, default limit 100 (max 500), `failed_at DESC`. Item = `DlqEvent`        |
+| POST   | `/admin/v1/tenants/{tenantID}/dlq/{id}/retry`                      | `dlq:retry` | Republish → `{id,status:"retried"}`                                                       |
+| POST   | `/admin/v1/tenants/{tenantID}/dlq/{id}/discard`                    | `dlq:retry` | Discard → `{id,status:"discarded"}` (**note: discard shares the `dlq:retry` permission**) |
 
 > No DLQ export / mark-resolved endpoint — only list/retry/discard (gap #4).
 
@@ -186,12 +186,12 @@ Generate TS types + TanStack Query hooks from the backend OpenAPI spec:
 
 **Hand-written hooks fill spec gaps** — Orval only generates what's in `openapi.yaml`. Write hooks by hand (in each feature's `hooks/`, using the shared `api` instance) for:
 
-| Gap | Reason |
-|---|---|
-| `DELETE .../segments/{id}` | In code, not in `openapi.yaml` (gap #5) |
-| `GET .../segments` (list all) | Not confirmed in spec (gap #7) — **TBD — backend gap** |
-| List tenants / list sources | Not confirmed in spec — **TBD — backend gap** |
-| Any endpoint the spec omits | Cross-check against §4 tables; hand-write and keep the shape from [Data model & types](07-data-model-and-types.md) |
+| Gap                           | Reason                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DELETE .../segments/{id}`    | In code, not in `openapi.yaml` (gap #5)                                                                            |
+| `GET .../segments` (list all) | Not confirmed in spec (gap #7) — **TBD — backend gap**                                                             |
+| List tenants / list sources   | Not confirmed in spec — **TBD — backend gap**                                                                      |
+| Any endpoint the spec omits   | Cross-check against §4 tables; hand-write and keep the shape from [Data model & types](07-data-model-and-types.md) |
 
 Hand-written types that supplement Orval output live in `src/types/` (§4 of the brief / [Data model & types](07-data-model-and-types.md)).
 
@@ -257,10 +257,9 @@ export function useEvents(
     queryKey: qk.events(tenantId).list(filters),
     initialPageParam: '' as string,
     queryFn: async ({ pageParam }) => {
-      const { data } = await api.get<KeysetPage<RawEvent>>(
-        tenantPath(tenantId, '/events'),
-        { params: { limit: 50, cursor: pageParam || undefined, ...filters } },
-      );
+      const { data } = await api.get<KeysetPage<RawEvent>>(tenantPath(tenantId, '/events'), {
+        params: { limit: 50, cursor: pageParam || undefined, ...filters },
+      });
       return data;
     },
     // empty next_cursor => no more pages
@@ -275,25 +274,25 @@ Feed `data.pages.flatMap(p => p.events)` into the MUI X Data Grid in **server mo
 
 Every mutation invalidates the keys its write affects. One-time-secret responses are surfaced via the dialog (§8) **before** invalidation.
 
-| Mutation (endpoint) | Invalidates | Notes |
-|---|---|---|
-| Create source (`POST .../sources`) | `qk.sources(t).all()` | Show `SourceKeyOnce` in OneTimeSecretDialog |
-| Rotate key (`POST .../sources/{id}/rotate-key`) | `qk.sources(t).all()` | Show new key once; old key dead immediately |
-| Mint admin token (`POST /admin/v1/admin-tokens`) | admin-tokens list key | Show `AdminTokenOnce` in dialog |
-| Create tenant (`POST /admin/v1/tenants`) | tenants list key | SUPER_ADMIN only |
-| Replay event (`POST .../events/{id}/replay`) | `qk.events(t).list(*)` | Async — show processing-lag hint |
-| Replay by identifier (`POST .../replay`) | `qk.events(t).list(*)` | Async |
-| Set consent (`PUT .../consent`) | `qk.profiles(t).consent(cuid)` | — |
-| GDPR delete (`DELETE .../profiles/{cuid}`) | `qk.profiles(t).detail(cuid)`, search keys | Confirm flow; profile now gone |
-| Create segment (`POST .../segments`) | `qk.segments(t).all()` | — |
-| Edit segment (`PUT .../segments/{id}`) | `qk.segments(t).detail(id)`, `.all()`, `.members(id)` | Creates new version |
-| Deactivate segment (`DELETE .../segments/{id}`) | `qk.segments(t).all()`, `.detail(id)` | Hand-written (gap #5) |
-| Create destination (`POST .../destinations`) | `qk.destinations(t).all()` | Secret never returned |
-| Update destination (`PUT .../destinations/{id}`) | `qk.destinations(t).detail(id)`, `.all()` | e.g. disable |
-| Add subscription (`POST .../subscriptions`) | `qk.destinations(t).detail(id)`, `qk.segments(t).destinations(seg)` | — |
-| Delete subscription (`DELETE .../subscriptions/{id}`) | `qk.destinations(t).detail(id)` | Idempotent |
-| DLQ retry (`POST .../dlq/{id}/retry`) | `qk.dlq(t).list(*)` | Async |
-| DLQ discard (`POST .../dlq/{id}/discard`) | `qk.dlq(t).list(*)` | Confirm flow; `dlq:retry` perm |
+| Mutation (endpoint)                                   | Invalidates                                                         | Notes                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| Create source (`POST .../sources`)                    | `qk.sources(t).all()`                                               | Show `SourceKeyOnce` in OneTimeSecretDialog |
+| Rotate key (`POST .../sources/{id}/rotate-key`)       | `qk.sources(t).all()`                                               | Show new key once; old key dead immediately |
+| Mint admin token (`POST /admin/v1/admin-tokens`)      | admin-tokens list key                                               | Show `AdminTokenOnce` in dialog             |
+| Create tenant (`POST /admin/v1/tenants`)              | tenants list key                                                    | SUPER_ADMIN only                            |
+| Replay event (`POST .../events/{id}/replay`)          | `qk.events(t).list(*)`                                              | Async — show processing-lag hint            |
+| Replay by identifier (`POST .../replay`)              | `qk.events(t).list(*)`                                              | Async                                       |
+| Set consent (`PUT .../consent`)                       | `qk.profiles(t).consent(cuid)`                                      | —                                           |
+| GDPR delete (`DELETE .../profiles/{cuid}`)            | `qk.profiles(t).detail(cuid)`, search keys                          | Confirm flow; profile now gone              |
+| Create segment (`POST .../segments`)                  | `qk.segments(t).all()`                                              | —                                           |
+| Edit segment (`PUT .../segments/{id}`)                | `qk.segments(t).detail(id)`, `.all()`, `.members(id)`               | Creates new version                         |
+| Deactivate segment (`DELETE .../segments/{id}`)       | `qk.segments(t).all()`, `.detail(id)`                               | Hand-written (gap #5)                       |
+| Create destination (`POST .../destinations`)          | `qk.destinations(t).all()`                                          | Secret never returned                       |
+| Update destination (`PUT .../destinations/{id}`)      | `qk.destinations(t).detail(id)`, `.all()`                           | e.g. disable                                |
+| Add subscription (`POST .../subscriptions`)           | `qk.destinations(t).detail(id)`, `qk.segments(t).destinations(seg)` | —                                           |
+| Delete subscription (`DELETE .../subscriptions/{id}`) | `qk.destinations(t).detail(id)`                                     | Idempotent                                  |
+| DLQ retry (`POST .../dlq/{id}/retry`)                 | `qk.dlq(t).list(*)`                                                 | Async                                       |
+| DLQ discard (`POST .../dlq/{id}/discard`)             | `qk.dlq(t).list(*)`                                                 | Confirm flow; `dlq:retry` perm              |
 
 > Because identity → profile → segmentation → activation is **asynchronous**, invalidations often won't show fresh results immediately. Pair replay/ingest-affecting mutations with the "processing — data may take a few seconds; refresh to see updates" affordance rather than optimistic UI.
 
@@ -309,17 +308,17 @@ All errors use one envelope (`pkg/apierror`):
 
 Code → HTTP status:
 
-| `error.code` | HTTP | Notes |
-|---|---|---|
-| `bad_request` | 400 | Map to form fields where possible (e.g. profile search with neither email nor phone) |
-| `unauthorized` | 401 | Bad/missing token |
-| `forbidden` | 403 | Missing permission OR tenant-scope violation |
-| `not_found` | 404 | — |
-| `conflict` | 409 | — |
-| `payload_too_large` | 413 | — |
-| `rate_limited` | 429 | `Retry-After` header, integer seconds |
-| `internal_error` | 500 | — |
-| `not_ready` | 503 | Readiness failure |
+| `error.code`        | HTTP | Notes                                                                                |
+| ------------------- | ---- | ------------------------------------------------------------------------------------ |
+| `bad_request`       | 400  | Map to form fields where possible (e.g. profile search with neither email nor phone) |
+| `unauthorized`      | 401  | Bad/missing token                                                                    |
+| `forbidden`         | 403  | Missing permission OR tenant-scope violation                                         |
+| `not_found`         | 404  | —                                                                                    |
+| `conflict`          | 409  | —                                                                                    |
+| `payload_too_large` | 413  | —                                                                                    |
+| `rate_limited`      | 429  | `Retry-After` header, integer seconds                                                |
+| `internal_error`    | 500  | —                                                                                    |
+| `not_ready`         | 503  | Readiness failure                                                                    |
 
 Central **response interceptor** behavior:
 
@@ -334,14 +333,14 @@ api.interceptors.response.use(
 
     if (status === 401) {
       clearToken();
-      redirectTo('/connect');            // bad/missing token
+      redirectTo('/connect'); // bad/missing token
     } else if (status === 403) {
-      toast.error(message);              // permission or tenant scope — do NOT log out
+      toast.error(message); // permission or tenant scope — do NOT log out
     } else if (status === 429) {
       const retry = Number(err.response?.headers['retry-after'] ?? 0);
       toast.warning(`Rate limited — retry in ${retry}s`);
     } else {
-      toast.error(message);              // 400/404/409/413/500/503 — surface to user
+      toast.error(message); // 400/404/409/413/500/503 — surface to user
     }
     return Promise.reject(err);
   },
@@ -356,10 +355,10 @@ api.interceptors.response.use(
 
 Two distinct patterns — do not mix them:
 
-| Pattern | Applies to | Mechanism |
-|---|---|---|
-| **Keyset / cursor** | `GET .../events` **only** | `limit` (default 50, max 500) + opaque `cursor` → `next_cursor`. Data Grid in **server mode** with cursor state; `useInfiniteQuery` (§6.2). Empty `next_cursor` = last page. Never page numbers. |
-| **Filter-only, full array** | profiles (email/phone), dlq (status), segment members, deliveries, consent, replay results | API returns the whole array. Render with the Data Grid in **client mode** (client-side paging/sorting/filtering). |
+| Pattern                     | Applies to                                                                                 | Mechanism                                                                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Keyset / cursor**         | `GET .../events` **only**                                                                  | `limit` (default 50, max 500) + opaque `cursor` → `next_cursor`. Data Grid in **server mode** with cursor state; `useInfiniteQuery` (§6.2). Empty `next_cursor` = last page. Never page numbers. |
+| **Filter-only, full array** | profiles (email/phone), dlq (status), segment members, deliveries, consent, replay results | API returns the whole array. Render with the Data Grid in **client mode** (client-side paging/sorting/filtering).                                                                                |
 
 ---
 
@@ -367,11 +366,11 @@ Two distinct patterns — do not mix them:
 
 Three responses return a plaintext secret **exactly once** and it can never be retrieved again:
 
-| Trigger | Response type | Prefix |
-|---|---|---|
-| Create source / rotate key | `SourceKeyOnce` (`{api_key}`) | `cdp_` |
-| Mint admin token | `AdminTokenOnce` (`{api_token, role}`) | `cdpadm_` |
-| Create destination with `secret` | (echoed input only — the server never returns it after) | — |
+| Trigger                          | Response type                                           | Prefix    |
+| -------------------------------- | ------------------------------------------------------- | --------- |
+| Create source / rotate key       | `SourceKeyOnce` (`{api_key}`)                           | `cdp_`    |
+| Mint admin token                 | `AdminTokenOnce` (`{api_token, role}`)                  | `cdpadm_` |
+| Create destination with `secret` | (echoed input only — the server never returns it after) | —         |
 
 The client must surface these through the shared **`OneTimeSecretDialog`** ([Design system](06-design-system.md)): show the value once, a large copy button, an explicit "you cannot see this value again" warning, and require an explicit confirm to close. Do this in the mutation's `onSuccess` **before** cache invalidation. Never persist these values in the query cache or logs.
 
@@ -381,13 +380,13 @@ The client must surface these through the shared **`OneTimeSecretDialog`** ([Des
 
 The console **never authenticates with source keys** and never calls ingress. These paths appear only in the Sources "instrument your source" help text for hand-off to the customer's engineers.
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/v1/auth/whoami` | → `{tenant_id, source_id}` (source-key context) |
-| POST | `/v1/events/track` | `202 Accepted` |
-| POST | `/v1/identify` | `202` |
-| POST | `/v1/alias` | `202` |
-| POST | `/v1/events/batch` | ≤ 500 events, `202` |
+| Method | Path               | Notes                                           |
+| ------ | ------------------ | ----------------------------------------------- |
+| GET    | `/v1/auth/whoami`  | → `{tenant_id, source_id}` (source-key context) |
+| POST   | `/v1/events/track` | `202 Accepted`                                  |
+| POST   | `/v1/identify`     | `202`                                           |
+| POST   | `/v1/alias`        | `202`                                           |
+| POST   | `/v1/events/batch` | ≤ 500 events, `202`                             |
 
 Ingress auth: `X-CDP-Api-Key: <key>` **or** `Authorization: Bearer <key>`; key format `cdp_...`.
 

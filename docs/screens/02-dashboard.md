@@ -16,8 +16,8 @@ others are **only in Prometheus/Grafana** and cannot be rendered as JSON gauges 
 
 ## Route(s)
 
-| Route | Notes |
-|---|---|
+| Route                    | Notes                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------- |
 | `/t/:tenantId/dashboard` | Child of the `/t/:tenantId` layout route. Default landing after tenant pick. |
 
 ## Required permission(s)
@@ -26,17 +26,17 @@ The dashboard is read-only and composes several read endpoints. There is **no si
 dashboard endpoint**; each card gates independently on its own permission. Missing a
 permission hides (not errors) the corresponding card.
 
-| Card / element | Permission | If missing |
-|---|---|---|
-| Health strip (`/healthz`, `/readyz`) | none (unauthenticated meta) | always shown |
-| DLQ open count | `dlq:read` | hide card |
-| Activation success rate | `activation:read` | hide card |
-| Segment count | `segment:read` | hide card |
-| Source count | `source:read` | hide card |
-| Processing lag / metrics | none (Grafana link) or backend gap for JSON | show Grafana link |
-| Quick action: create source | `source:write` | disable (tooltip "requires source:write") |
-| Quick action: look up profile | `profile:read` | disable (tooltip "requires profile:read") |
-| Quick action: create segment | `segment:write` | disable (tooltip "requires segment:write") |
+| Card / element                       | Permission                                  | If missing                                 |
+| ------------------------------------ | ------------------------------------------- | ------------------------------------------ |
+| Health strip (`/healthz`, `/readyz`) | none (unauthenticated meta)                 | always shown                               |
+| DLQ open count                       | `dlq:read`                                  | hide card                                  |
+| Activation success rate              | `activation:read`                           | hide card                                  |
+| Segment count                        | `segment:read`                              | hide card                                  |
+| Source count                         | `source:read`                               | hide card                                  |
+| Processing lag / metrics             | none (Grafana link) or backend gap for JSON | show Grafana link                          |
+| Quick action: create source          | `source:write`                              | disable (tooltip "requires source:write")  |
+| Quick action: look up profile        | `profile:read`                              | disable (tooltip "requires profile:read")  |
+| Quick action: create segment         | `segment:write`                             | disable (tooltip "requires segment:write") |
 
 Role → permission gating is computed client-side from the canonical role→perm table (there is
 **no admin whoami endpoint**). See [Auth & RBAC](../05-auth-rbac-tenancy.md) and
@@ -46,20 +46,20 @@ Role → permission gating is computed client-side from the canonical role→per
 
 ### Health / meta (unauthenticated)
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/healthz` | Liveness. |
-| `GET` | `/readyz` | Readiness (DB ping). Non-200 ⇒ "not ready". |
-| `GET` | `/metrics` | Prometheus **text** (NOT JSON). Not parsed by the frontend — see below. |
+| Method | Path       | Purpose                                                                 |
+| ------ | ---------- | ----------------------------------------------------------------------- |
+| `GET`  | `/healthz` | Liveness.                                                               |
+| `GET`  | `/readyz`  | Readiness (DB ping). Non-200 ⇒ "not ready".                             |
+| `GET`  | `/metrics` | Prometheus **text** (NOT JSON). Not parsed by the frontend — see below. |
 
 ### Tenant-scoped reads (built via `tenantPath(tenantId, suffix)`)
 
-| Method | Path | Permission | Feeds card |
-|---|---|---|---|
-| `GET` | `/admin/v1/tenants/{tenantID}/dlq?status=open` | `dlq:read` | DLQ open count (`events.length`) |
-| `GET` | `/admin/v1/tenants/{tenantID}/segments` | `segment:read` | Segment count — **TBD**, list endpoint unconfirmed |
-| `GET` | `/admin/v1/tenants/{tenantID}/sources` | `source:read` | Source count — **TBD**, list endpoint unconfirmed |
-| `GET` | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/deliveries` | `activation:read` | Activation success rate (per-destination; aggregate is approximate) |
+| Method | Path                                                                   | Permission        | Feeds card                                                          |
+| ------ | ---------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------- |
+| `GET`  | `/admin/v1/tenants/{tenantID}/dlq?status=open`                         | `dlq:read`        | DLQ open count (`events.length`)                                    |
+| `GET`  | `/admin/v1/tenants/{tenantID}/segments`                                | `segment:read`    | Segment count — **TBD**, list endpoint unconfirmed                  |
+| `GET`  | `/admin/v1/tenants/{tenantID}/sources`                                 | `source:read`     | Source count — **TBD**, list endpoint unconfirmed                   |
+| `GET`  | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/deliveries` | `activation:read` | Activation success rate (per-destination; aggregate is approximate) |
 
 > **TBD — backend gap:** the spec extract confirms no "list all segments" and no "list all
 > sources" endpoint. Segment/source count cards depend on `GET .../segments` and
@@ -106,8 +106,8 @@ MUI `Card`/`CardContent`; each card owns its own TanStack Query and loading/empt
 
 ```tsx
 function HealthStrip() {
-  const health = useHealthz();   // GET /healthz
-  const ready = useReadyz();     // GET /readyz
+  const health = useHealthz(); // GET /healthz
+  const ready = useReadyz(); // GET /readyz
   return (
     <Stack direction="row" spacing={2} alignItems="center">
       <StatusChip label="Liveness" ok={health.isSuccess} />
@@ -127,14 +127,14 @@ Compute an approximate rate by iterating a destination's deliveries and label it
 
 ```tsx
 // deliveries: DeliveryLog[] from GET .../destinations/{id}/deliveries
-const succeeded = deliveries.filter(d => d.status === 'succeeded').length;
+const succeeded = deliveries.filter((d) => d.status === 'succeeded').length;
 const total = deliveries.length;
 const rate = total ? succeeded / total : null; // show "—" when total === 0
 // Label: "Activation success (approx., per destination)"
 ```
 
 > Task statuses: `pending, sending, succeeded, failed_retryable, failed_permanent, dlq,
-> skipped` (`skipped` = consent denied). Excluding `skipped` from the denominator is a product
+skipped` (`skipped` = consent denied). Excluding `skipped` from the denominator is a product
 > choice — document whichever you pick. Aggregating across all destinations is **TBD** (no
 > aggregate endpoint). See [Activation & Destinations](07-activation-destinations.md).
 
@@ -143,13 +143,13 @@ const rate = total ? succeeded / total : null; // show "—" when total === 0
 Types are defined in [Data model & types](../07-data-model-and-types.md); reference by name — do
 not redefine.
 
-| Card | Source shape |
-|---|---|
-| DLQ open count | `{ events: DlqEvent[] }` → `events.length` |
+| Card               | Source shape                                                              |
+| ------------------ | ------------------------------------------------------------------------- |
+| DLQ open count     | `{ events: DlqEvent[] }` → `events.length`                                |
 | Activation success | `DeliveryLog[]` (fields: `status: ActivationTaskStatus`, `attempt_count`) |
-| Segment count | `Segment[]` (TBD list endpoint) |
-| Source count | `Source[]` (TBD list endpoint) |
-| Health | plain `200` OK / non-200; no body needed |
+| Segment count      | `Segment[]` (TBD list endpoint)                                           |
+| Source count       | `Source[]` (TBD list endpoint)                                            |
+| Health             | plain `200` OK / non-200; no body needed                                  |
 
 `DlqStatus = 'open' | 'retried' | 'discarded'`. The DLQ open-count query MUST use
 `?status=open` verbatim.
@@ -158,13 +158,13 @@ not redefine.
 
 Each card manages state independently so one failing card never blanks the page.
 
-| State | Rendering |
-|---|---|
-| Loading | Skeleton inside the card (MUI `Skeleton`); health chips show indeterminate. |
-| Empty | Zero is a valid value: DLQ open `0` → green "no backlog"; counts `0` → "None yet". |
-| Error | `ErrorState` inside the card with a retry button; other cards keep rendering. |
-| Not ready | `/readyz` non-200 → red readiness chip + banner "Backend not ready (DB)". |
-| Permission-missing | Card is **hidden** (not an error) when the role lacks the read perm. |
+| State               | Rendering                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| Loading             | Skeleton inside the card (MUI `Skeleton`); health chips show indeterminate.               |
+| Empty               | Zero is a valid value: DLQ open `0` → green "no backlog"; counts `0` → "None yet".        |
+| Error               | `ErrorState` inside the card with a retry button; other cards keep rendering.             |
+| Not ready           | `/readyz` non-200 → red readiness chip + banner "Backend not ready (DB)".                 |
+| Permission-missing  | Card is **hidden** (not an error) when the role lacks the read perm.                      |
 | Metrics unavailable | Processing-lag/gauge cards show "View in Grafana" or "TBD — needs JSON metrics endpoint". |
 
 ## Actions & confirmations
@@ -172,20 +172,23 @@ Each card manages state independently so one failing card never blanks the page.
 All dashboard actions are navigational or read-only — **no destructive actions, no
 confirmations** here.
 
-| Action | Gate | Behavior |
-|---|---|---|
-| Refresh | none | Invalidate dashboard query keys; refetch all cards. |
-| Create source | `source:write` | Navigate to `/t/:tenantId/sources` (create flow). |
-| Look up profile | `profile:read` | Navigate to `/t/:tenantId/profiles`. |
-| Create segment | `segment:write` | Navigate to `/t/:tenantId/segments/new`. |
-| Open DLQ | `dlq:read` | Navigate to `/t/:tenantId/dlq?status=open`. |
-| Open metrics | none | Open Grafana (`:3000`) in a new tab. |
+| Action          | Gate            | Behavior                                            |
+| --------------- | --------------- | --------------------------------------------------- |
+| Refresh         | none            | Invalidate dashboard query keys; refetch all cards. |
+| Create source   | `source:write`  | Navigate to `/t/:tenantId/sources` (create flow).   |
+| Look up profile | `profile:read`  | Navigate to `/t/:tenantId/profiles`.                |
+| Create segment  | `segment:write` | Navigate to `/t/:tenantId/segments/new`.            |
+| Open DLQ        | `dlq:read`      | Navigate to `/t/:tenantId/dlq?status=open`.         |
+| Open metrics    | none            | Open Grafana (`:3000`) in a new tab.                |
 
 Quick actions are wrapped in `<RequirePerm>`; when the role lacks the perm, render a disabled
 button with tooltip "requires `<perm>`".
 
 ```tsx
-<RequirePerm perm="source:write" fallback={<DisabledAction label="Create source" perm="source:write" />}>
+<RequirePerm
+  perm="source:write"
+  fallback={<DisabledAction label="Create source" perm="source:write" />}
+>
   <Button onClick={() => nav(`/t/${tenantId}/sources`)}>Create source</Button>
 </RequirePerm>
 ```

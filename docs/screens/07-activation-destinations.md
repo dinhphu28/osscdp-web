@@ -15,22 +15,22 @@ segmentation. Deliveries do not appear instantly — surface processing-lag/refr
 
 ## Route(s)
 
-| Route | Screen |
-|---|---|
-| `/t/:tenantId/destinations` | Destinations list + create |
+| Route                                      | Screen                                                |
+| ------------------------------------------ | ----------------------------------------------------- |
+| `/t/:tenantId/destinations`                | Destinations list + create                            |
 | `/t/:tenantId/destinations/:destinationId` | Destination detail: config, subscriptions, deliveries |
 
 ## Required permission(s)
 
-| Action | Permission |
-|---|---|
-| View destinations / detail | `destination:read` |
-| Create destination | `destination:write` |
-| Edit / disable destination | `destination:write` |
-| Add subscription | `destination:write` |
-| Remove (soft-disable) subscription | `destination:write` |
-| View delivery log | `activation:read` |
-| Pick a segment to subscribe (segment list/detail) | `segment:read` |
+| Action                                            | Permission          |
+| ------------------------------------------------- | ------------------- |
+| View destinations / detail                        | `destination:read`  |
+| Create destination                                | `destination:write` |
+| Edit / disable destination                        | `destination:write` |
+| Add subscription                                  | `destination:write` |
+| Remove (soft-disable) subscription                | `destination:write` |
+| View delivery log                                 | `activation:read`   |
+| Pick a segment to subscribe (segment list/detail) | `segment:read`      |
 
 Roles holding `destination:write`: `SUPER_ADMIN`, `TENANT_ADMIN`, `MARKETER`. `activation:read` and
 `destination:read` are in the read set (all roles). Gate write actions with `<RequirePerm perm="destination:write">`.
@@ -41,15 +41,15 @@ See [RBAC](../05-auth-rbac-tenancy.md).
 All paths are prefixed `/admin/v1/tenants/{tenantID}` (built via `tenantPath(tenantId, suffix)`), sent
 with `Authorization: Bearer <adminToken>`.
 
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| `POST` | `.../destinations` | `destination:write` | Body `{type, name, secret?, channel?, purpose?, config}` → `201`. **secret never returned.** |
-| `GET` | `.../destinations/{destinationID}` | `destination:read` | Fetch one destination. |
-| `PUT` | `.../destinations/{destinationID}` | `destination:write` | Edit; e.g. disable (`status`). |
-| `POST` | `.../destinations/{destinationID}/subscriptions` | `destination:write` | Body `{trigger_type:"segment_membership", segment_id}`. |
-| `DELETE` | `.../destinations/{destinationID}/subscriptions/{subscriptionID}` | `destination:write` | Soft-disable, **idempotent**. |
-| `GET` | `.../destinations/{destinationID}/deliveries` | `activation:read` | Delivery attempts (filter-only, no paging → full array). |
-| `GET` | `.../segments/{segmentID}/destinations` | `destination:read` | Destinations wired to a given segment (used from Segments screen). |
+| Method   | Path                                                              | Permission          | Notes                                                                                        |
+| -------- | ----------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `POST`   | `.../destinations`                                                | `destination:write` | Body `{type, name, secret?, channel?, purpose?, config}` → `201`. **secret never returned.** |
+| `GET`    | `.../destinations/{destinationID}`                                | `destination:read`  | Fetch one destination.                                                                       |
+| `PUT`    | `.../destinations/{destinationID}`                                | `destination:write` | Edit; e.g. disable (`status`).                                                               |
+| `POST`   | `.../destinations/{destinationID}/subscriptions`                  | `destination:write` | Body `{trigger_type:"segment_membership", segment_id}`.                                      |
+| `DELETE` | `.../destinations/{destinationID}/subscriptions/{subscriptionID}` | `destination:write` | Soft-disable, **idempotent**.                                                                |
+| `GET`    | `.../destinations/{destinationID}/deliveries`                     | `activation:read`   | Delivery attempts (filter-only, no paging → full array).                                     |
+| `GET`    | `.../segments/{segmentID}/destinations`                           | `destination:read`  | Destinations wired to a given segment (used from Segments screen).                           |
 
 > **TBD — backend gap:** there is **no confirmed "list all destinations" `GET .../destinations`
 > endpoint** in the spec extract. The list view needs it. Until confirmed, see
@@ -60,6 +60,7 @@ with `Authorization: Bearer <adminToken>`.
 ## Layout & components
 
 ### Destinations list (`/t/:tenantId/destinations`)
+
 - **PageHeader**: title "Destinations", primary action **New destination** (gated `destination:write`).
 - **MUI X Data Grid** (client mode — filter-only, no server paging). Columns: `name`, `type`
   (StatusChip), `status` (`active`/`disabled` StatusChip), `channel`, `purpose`, id (copyable),
@@ -68,24 +69,26 @@ with `Authorization: Bearer <adminToken>`.
   destinations are reachable via detail links / segments.
 
 ### Create destination form (dialog or `/destinations` inline panel)
+
 - **Type selector**: `webhook` and `kafka` **ENABLED**; `push`, `email`, `crm`, `ads`, `warehouse`
   rendered **DISABLED** with a "coming soon" label (declared-but-deferred types).
 - Common fields: `name` (required), `channel?` (ConsentChannel), `purpose?` (ConsentPurpose) — the
   channel/purpose pair drives **consent routing** (activation skips customers who denied that
   channel×purpose → delivery status `skipped`).
 - **Webhook config** (`type: "webhook"`):
-  | Field | Location | Default | Required |
-  |---|---|---|---|
-  | `url` | `config.url` | — | ✅ |
-  | `method` | `config.method` | `POST` | — (`POST`\|`PUT`) |
-  | `headers` | `config.headers` (key/value editor `{}`) | `{}` | — |
-  | `timeout_ms` | `config.timeout_ms` | `5000` | — |
-  | `max_retries` | `config.max_retries` | `5` | — |
-  | `secret` | **top-level** `secret` (HMAC signing key) | — | — |
+  | Field         | Location                                  | Default | Required          |
+  | ------------- | ----------------------------------------- | ------- | ----------------- |
+  | `url`         | `config.url`                              | —       | ✅                |
+  | `method`      | `config.method`                           | `POST`  | — (`POST`\|`PUT`) |
+  | `headers`     | `config.headers` (key/value editor `{}`)  | `{}`    | —                 |
+  | `timeout_ms`  | `config.timeout_ms`                       | `5000`  | —                 |
+  | `max_retries` | `config.max_retries`                      | `5`     | —                 |
+  | `secret`      | **top-level** `secret` (HMAC signing key) | —       | —                 |
 - **Kafka config** (`type: "kafka"`):
-  | Field | Location | Required |
-  |---|---|---|
-  | `topic` | `config.topic` | ✅ |
+
+  | Field    | Location           | Required     |
+  | -------- | ------------------ | ------------ |
+  | `topic`  | `config.topic`     | ✅           |
   | `secret` | top-level `secret` | — (optional) |
 
 - **Secret handling (one-time, write-only):** the top-level `secret` is used for HMAC signing, stored
@@ -97,7 +100,9 @@ with `Authorization: Bearer <adminToken>`.
     and can only be replaced by editing the destination.
 
 ### Destination detail (`/t/:tenantId/destinations/:destinationId`)
+
 Three regions (tabs or stacked panels):
+
 1. **Config** — read-only view of `type`, `name`, `status`, `channel`, `purpose`, `config_json`
    (JsonViewer). Actions: **Edit**, **Disable** (`PUT`, ConfirmDialog).
 2. **Subscriptions** — list of segment subscriptions; **Add subscription** (pick a segment); each row
@@ -130,26 +135,29 @@ await api.delete(tenantPath(tenantId, `/destinations/${destId}/subscriptions/${s
 paging params → client-mode Data Grid).
 
 ### Deliveries table columns
-| Column | Field | Render |
-|---|---|---|
-| Status | `status` | StatusChip (see status table) |
-| HTTP | `http_status` | numeric badge (webhook only) |
-| Attempts | `attempt_count` | number |
-| Error | `error_message` | truncated + tooltip |
-| Sent at | `sent_at` | relative time |
+
+| Column   | Field           | Render                        |
+| -------- | --------------- | ----------------------------- |
+| Status   | `status`        | StatusChip (see status table) |
+| HTTP     | `http_status`   | numeric badge (webhook only)  |
+| Attempts | `attempt_count` | number                        |
+| Error    | `error_message` | truncated + tooltip           |
+| Sent at  | `sent_at`       | relative time                 |
 
 ### Delivery / task statuses (`ActivationTaskStatus`)
-| Status | Meaning | Chip color |
-|---|---|---|
-| `pending` | queued, not yet sent | default |
-| `sending` | in flight | info |
-| `succeeded` | delivered OK | success |
-| `failed_retryable` | transient failure, will retry | warning |
-| `failed_permanent` | non-retryable failure | error |
-| `dlq` | exhausted retries → dead-letter queue | error |
-| `skipped` | **consent_denied** — customer denied this channel×purpose | default/muted |
+
+| Status             | Meaning                                                   | Chip color    |
+| ------------------ | --------------------------------------------------------- | ------------- |
+| `pending`          | queued, not yet sent                                      | default       |
+| `sending`          | in flight                                                 | info          |
+| `succeeded`        | delivered OK                                              | success       |
+| `failed_retryable` | transient failure, will retry                             | warning       |
+| `failed_permanent` | non-retryable failure                                     | error         |
+| `dlq`              | exhausted retries → dead-letter queue                     | error         |
+| `skipped`          | **consent_denied** — customer denied this channel×purpose | default/muted |
 
 ### Retry / backoff & permanence rules (reference, backend behavior)
+
 - **Retryable** HTTP: `408`, `429`, `5xx` → `failed_retryable`, re-attempted.
 - **Permanent** HTTP: `400`, `401`, `403`, `404` → `failed_permanent`.
 - **Backoff:** `10s → 15min`, **max 5 retries**; on exhaustion the task lands in `dlq`.
@@ -160,6 +168,7 @@ paging params → client-mode Data Grid).
   > [Backend gaps](../10-backend-gaps-and-caveats.md).
 
 ### Enable / disable toggle
+
 Destination-level **Enable/Disable** via `PUT .../destinations/{id}` (set `status`). Disabling stops
 new deliveries. Confirm with ConfirmDialog (it affects live activation).
 
@@ -181,13 +190,13 @@ membership changes, osscdp POSTs this body to the webhook `url`:
 
 **Delivery headers** sent on every webhook call (show verbatim in the destination's help panel):
 
-| Header | Value |
-|---|---|
-| `X-CDP-Signature` | `sha256=<hmac(secret, body)>` |
-| `Idempotency-Key` | dedupe key (receiver should treat as unique) |
-| `X-CDP-Tenant-Id` | tenant UUID |
-| `X-CDP-Event-Id` | source event id |
-| `X-CDP-Destination-Id` | destination id |
+| Header                 | Value                                        |
+| ---------------------- | -------------------------------------------- |
+| `X-CDP-Signature`      | `sha256=<hmac(secret, body)>`                |
+| `Idempotency-Key`      | dedupe key (receiver should treat as unique) |
+| `X-CDP-Tenant-Id`      | tenant UUID                                  |
+| `X-CDP-Event-Id`       | source event id                              |
+| `X-CDP-Destination-Id` | destination id                               |
 
 Receivers verify `X-CDP-Signature` as HMAC-SHA256 of the raw body using the shared `secret`, and use
 `Idempotency-Key` to deduplicate.
@@ -199,18 +208,44 @@ From [Data model & types](../07-data-model-and-types.md) — use these exact nam
 ```ts
 export type DestinationType = 'webhook' | 'kafka' | 'push' | 'email' | 'crm' | 'ads' | 'warehouse';
 export type ActivationTaskStatus =
-  | 'pending' | 'sending' | 'succeeded' | 'failed_retryable'
-  | 'failed_permanent' | 'dlq' | 'skipped';
+  'pending' | 'sending' | 'succeeded' | 'failed_retryable' | 'failed_permanent' | 'dlq' | 'skipped';
 
 export interface Destination {
-  id: string; tenant_id: string; type: DestinationType; name: string;
-  status: 'active' | 'disabled' | string; config_json: Record<string, unknown>;
-  channel?: ConsentChannel; purpose?: ConsentPurpose; /* secret_ref never returned */
+  id: string;
+  tenant_id: string;
+  type: DestinationType;
+  name: string;
+  status: 'active' | 'disabled' | string;
+  config_json: Record<string, unknown>;
+  channel?: ConsentChannel;
+  purpose?: ConsentPurpose; /* secret_ref never returned */
 }
-export interface WebhookConfig { url: string; method?: 'POST' | 'PUT'; headers?: Record<string, string>; timeout_ms?: number; max_retries?: number; }
-export interface KafkaConfig { topic: string; }
-export interface Subscription { id: string; destination_id: string; trigger_type: 'segment_membership'; segment_id: string; status: string; }
-export interface DeliveryLog { id?: string; status: ActivationTaskStatus | string; http_status?: number; response_body_hash?: string; error_message?: string; attempt_count: number; sent_at?: string; }
+export interface WebhookConfig {
+  url: string;
+  method?: 'POST' | 'PUT';
+  headers?: Record<string, string>;
+  timeout_ms?: number;
+  max_retries?: number;
+}
+export interface KafkaConfig {
+  topic: string;
+}
+export interface Subscription {
+  id: string;
+  destination_id: string;
+  trigger_type: 'segment_membership';
+  segment_id: string;
+  status: string;
+}
+export interface DeliveryLog {
+  id?: string;
+  status: ActivationTaskStatus | string;
+  http_status?: number;
+  response_body_hash?: string;
+  error_message?: string;
+  attempt_count: number;
+  sent_at?: string;
+}
 ```
 
 > Only `webhook` and `kafka` are implemented types; the other `DestinationType` values are
@@ -240,13 +275,13 @@ export interface DeliveryLog { id?: string; status: ActivationTaskStatus | strin
 
 ## Actions & confirmations
 
-| Action | Trigger | Confirmation |
-|---|---|---|
-| Create destination | New destination form submit | inline warning that `secret` is write-only |
-| Disable destination | Disable button | **ConfirmDialog** — stops live deliveries |
-| Add subscription | Add subscription (pick segment) | none (reversible) |
-| Unsubscribe | Unsubscribe button | **ConfirmDialog** (idempotent soft-disable) |
-| Refresh deliveries | manual refresh button | none |
+| Action              | Trigger                         | Confirmation                                |
+| ------------------- | ------------------------------- | ------------------------------------------- |
+| Create destination  | New destination form submit     | inline warning that `secret` is write-only  |
+| Disable destination | Disable button                  | **ConfirmDialog** — stops live deliveries   |
+| Add subscription    | Add subscription (pick segment) | none (reversible)                           |
+| Unsubscribe         | Unsubscribe button              | **ConfirmDialog** (idempotent soft-disable) |
+| Refresh deliveries  | manual refresh button           | none                                        |
 
 - Mutations invalidate the relevant query keys (destination detail, subscriptions, deliveries).
 - After subscribing, show the async-pipeline note: deliveries appear once membership changes are
@@ -281,6 +316,7 @@ export interface DeliveryLog { id?: string; status: ActivationTaskStatus | strin
 - [ ] Loading/empty/error states present on list, subscriptions, and deliveries.
 
 ## See also
+
 - [API integration](../04-api-integration.md)
 - [Auth, RBAC & tenancy](../05-auth-rbac-tenancy.md)
 - [Data model & types](../07-data-model-and-types.md)
