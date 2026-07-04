@@ -22,20 +22,20 @@ Read top-to-bottom. Each doc assumes you have read the ones above it.
 
 ## Document map
 
-| Doc path | What it covers | When to read it |
-|---|---|---|
-| [01-product-overview.md](01-product-overview.md) | CDP domain, console purpose, cross-cutting facts | First — grounds everything |
-| [02-tech-stack.md](02-tech-stack.md) | Pinned stack, env vars, CORS | Before scaffolding |
-| [03-architecture.md](03-architecture.md) | Folders, providers, routes, UI conventions | Before scaffolding |
-| [04-api-integration.md](04-api-integration.md) | Axios, interceptors, pagination, Orval | Before writing any API call |
-| [05-auth-rbac-tenancy.md](05-auth-rbac-tenancy.md) | Token auth, roles/permissions, tenancy, PII | Before auth/shell + any gated action |
-| [06-design-system.md](06-design-system.md) | Theme, shared components, states, a11y | Before building UI |
-| [07-data-model-and-types.md](07-data-model-and-types.md) | Canonical TS types & enums | When typing data or building forms |
-| [screens/screen-map.md](screens/00-screen-map.md) | Route → screen index (read first of screens) | Before any screen |
-| `docs/screens/*` | Per-screen build specs | When building that screen |
-| [08-testing.md](08-testing-and-quality.md) | Unit/component/e2e/a11y conventions | Alongside each feature |
-| [09-build-roadmap.md](09-build-roadmap.md) | **Execution order / phasing** | To decide what to build next |
-| [10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md) | **What can't be built yet + API caveats** | Before every screen; when blocked |
+| Doc path                                                         | What it covers                                   | When to read it                      |
+| ---------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
+| [01-product-overview.md](01-product-overview.md)                 | CDP domain, console purpose, cross-cutting facts | First — grounds everything           |
+| [02-tech-stack.md](02-tech-stack.md)                             | Pinned stack, env vars, CORS                     | Before scaffolding                   |
+| [03-architecture.md](03-architecture.md)                         | Folders, providers, routes, UI conventions       | Before scaffolding                   |
+| [04-api-integration.md](04-api-integration.md)                   | Axios, interceptors, pagination, Orval           | Before writing any API call          |
+| [05-auth-rbac-tenancy.md](05-auth-rbac-tenancy.md)               | Token auth, roles/permissions, tenancy, PII      | Before auth/shell + any gated action |
+| [06-design-system.md](06-design-system.md)                       | Theme, shared components, states, a11y           | Before building UI                   |
+| [07-data-model-and-types.md](07-data-model-and-types.md)         | Canonical TS types & enums                       | When typing data or building forms   |
+| [screens/screen-map.md](screens/00-screen-map.md)                | Route → screen index (read first of screens)     | Before any screen                    |
+| `docs/screens/*`                                                 | Per-screen build specs                           | When building that screen            |
+| [08-testing.md](08-testing-and-quality.md)                       | Unit/component/e2e/a11y conventions              | Alongside each feature               |
+| [09-build-roadmap.md](09-build-roadmap.md)                       | **Execution order / phasing**                    | To decide what to build next         |
+| [10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md) | **What can't be built yet + API caveats**        | Before every screen; when blocked    |
 
 ## How these docs relate
 

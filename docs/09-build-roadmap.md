@@ -21,13 +21,14 @@ Related docs: [API integration](04-api-integration.md) · [Auth, RBAC & tenancy]
 
 The backend repo is `/home/dinhphu28/ghq/github.com/dinhphu28/osscdp`. From that repo:
 
-| Command | Purpose |
-|---|---|
-| `make up` | Bring up the docker stack (Postgres, Kafka, API, worker, Grafana on `:3000`). API is mapped to `http://localhost:18080`. |
-| `make run-api` | Run the admin + ingress HTTP API locally (default `http://localhost:8080`). |
+| Command           | Purpose                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make up`         | Bring up the docker stack (Postgres, Kafka, API, worker, Grafana on `:3000`). API is mapped to `http://localhost:18080`.                    |
+| `make run-api`    | Run the admin + ingress HTTP API locally (default `http://localhost:8080`).                                                                 |
 | `make run-worker` | Run the async pipeline worker (identity → profile → segmentation → activation). Required for events to become profiles/segments/deliveries. |
 
 Notes:
+
 - Set `VITE_API_BASE_URL` to match: `http://localhost:8080` for `make run-api`, or `http://localhost:18080` for the docker stack.
 - The backend MUST set `CORS_ALLOWED_ORIGINS` to the console's dev origin (e.g. `http://localhost:5173`) or the browser blocks every request. `AllowCredentials: false`; token goes in the `Authorization` header.
 - Get an initial `SUPER_ADMIN` token from the backend env `ADMIN_API_TOKEN` (static bootstrap token). Use it in `/connect`.
@@ -69,7 +70,7 @@ Phase 4  Blocked / deferred
          Deferred destination types push/email/crm/ads/warehouse (shown disabled)
 ```
 
-Edges are hard dependencies. Segments depend on nothing but the shell to *create*, but the happy-path demo needs Sources → Events → Profiles first so there is data to segment and activate.
+Edges are hard dependencies. Segments depend on nothing but the shell to _create_, but the happy-path demo needs Sources → Events → Profiles first so there is data to segment and activate.
 
 ---
 
@@ -78,6 +79,7 @@ Edges are hard dependencies. Segments depend on nothing but the shell to *create
 **Goal:** an empty-but-wired app that boots, has the theme/providers/router shell, a generated typed API client, and the reusable UI primitives every later screen consumes.
 
 ### Deliverables
+
 - Vite v6+ + TypeScript **strict** project; pnpm; Node 20+.
 - ESLint (typescript-eslint) + Prettier configured and passing.
 - Folder structure exactly per [Architecture & conventions](03-architecture.md):
@@ -97,9 +99,11 @@ Edges are hard dependencies. Segments depend on nothing but the shell to *create
 - Vitest + React Testing Library + MSW harness scaffolded; Playwright configured.
 
 ### Dependencies
+
 None (greenfield). The repo is currently empty.
 
 ### Acceptance checklist
+
 - [ ] `pnpm dev` boots; `pnpm build`, `pnpm lint`, `pnpm typecheck` all pass with TS strict.
 - [ ] `pnpm gen:api` regenerates the Orval client from `openapi.yaml` with no errors.
 - [ ] All routes resolve to placeholder pages without crashing.
@@ -114,29 +118,33 @@ None (greenfield). The repo is currently empty.
 **Goal:** the operator can paste an admin token, land in a tenant-scoped shell, and the UI gates actions by role. There is **no login** — this is a paste-token flow.
 
 ### Deliverables
+
 - **`/connect`** screen ([screens/01-connect](screens/01-connect-and-shell.md)): paste admin Bearer token, optional **role declaration** (there is no admin whoami — see [Backend gaps](10-backend-gaps-and-caveats.md)), optional base-URL override. Validate the token with a cheap authenticated call; on success store the token; on `401` show an error and stay.
 - **AuthProvider / `useAuth`** (`src/lib/auth`): holds token + declared role in memory + `localStorage` (Zustand only if needed); `disconnect()` clears and returns to `/connect`.
 - **RBAC role→permission table** (client-side, canonical — copy exactly):
 
-  | Role | Permissions |
-  |---|---|
-  | `SUPER_ADMIN` | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
-  | `TENANT_ADMIN` | ALL permissions, scoped to its own tenant |
-  | `MARKETER` | read set + `segment:write`, `destination:write`, `consent:write` |
-  | `ANALYST` | read set only |
-  | `OPERATOR` | read set + `dlq:retry`, `event:replay` |
-  | `VIEWER` | read set only |
+  | Role           | Permissions                                                      |
+  | -------------- | ---------------------------------------------------------------- |
+  | `SUPER_ADMIN`  | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
+  | `TENANT_ADMIN` | ALL permissions, scoped to its own tenant                        |
+  | `MARKETER`     | read set + `segment:write`, `destination:write`, `consent:write` |
+  | `ANALYST`      | read set only                                                    |
+  | `OPERATOR`     | read set + `dlq:retry`, `event:replay`                           |
+  | `VIEWER`       | read set only                                                    |
 
   Read set = `source:read, event:read, profile:read, segment:read, destination:read, activation:read, audit:read, dlq:read`. `pii:read`, `admin:write`, `profile:delete` are ONLY in `SUPER_ADMIN`/`TENANT_ADMIN`.
+
 - **`<RequirePerm perm="...">`** wrapper: hides or disables actions the declared role lacks; disabled controls carry a tooltip `requires <perm>`. UI gating is UX only — the server also enforces `403`.
 - **TenantProvider / `useTenant`** (`src/lib/tenant`): current tenant from `:tenantId` path segment; the Axios layer injects `{tenantID}` into admin paths. Never send tenant in body/header.
 - **Tenant switcher**: `SUPER_ADMIN` (tenant nil) sees all tenants; non-super tokens are pinned to one tenant (switcher shows only that or is hidden).
 - **AppLayout** ([screens/02-app-shell](screens/01-connect-and-shell.md)): nav rail + top bar + tenant switcher + theme toggle + "connected as `<role>`" indicator + disconnect + `<Outlet/>`.
 
 ### Dependencies
+
 Phase 0 (axios interceptors, providers, router, theme).
 
 ### Acceptance checklist
+
 - [ ] Pasting the backend `ADMIN_API_TOKEN` connects and lands in the shell; a bad token yields a clear error and no navigation.
 - [ ] `401` from any call clears the token and redirects to `/connect`.
 - [ ] Declaring `VIEWER` hides/disables all write actions; declaring `SUPER_ADMIN` reveals them (verified by an RBAC gating test).
@@ -151,22 +159,26 @@ Phase 0 (axios interceptors, providers, router, theme).
 **Goal:** end-to-end demonstrate the CDP: provision a source → send/inspect events → resolve a customer profile → build a segment → activate to a destination and see deliveries. Build in this order; each feature feeds the next.
 
 ### 2a. Sources — [screens/04-sources](screens/03-sources.md)
+
 - List sources; create source (`POST /admin/v1/tenants/{tenantID}/sources`, perm `source:write`) → **returns ingest API key ONCE** → show `OneTimeSecretDialog` (prefix `cdp_`, "cannot be retrieved again").
 - Rotate key (`POST .../sources/{sourceID}/rotate-key`, `source:write`) behind `ConfirmDialog` (old key invalid immediately) → one-time modal.
 - Disable source (`PUT` where applicable); instrumentation help panel showing ingress endpoints and header `X-CDP-Api-Key` (note the `X-Api-Key` CORS mismatch — see [Backend gaps](10-backend-gaps-and-caveats.md)). The console never authenticates with source keys.
 
 ### 2b. Events explorer — [screens/05-events](screens/04-events-explorer.md)
+
 - `GET /admin/v1/tenants/{tenantID}/events` (`event:read`) — **keyset pagination**: `limit` (default 50, max 500), opaque `cursor` → `next_cursor`; use `useInfiniteQuery` and Data Grid **server mode** with cursor state (not page numbers). Filters `identifier_key` (e.g. `user_id:u1`), `event_name`.
 - Event detail (`GET .../events/{eventID}`) with `JsonViewer` for `payload_json`.
 - Replay one (`POST .../events/{eventID}/replay`, `event:replay`); replay-by-identifier (`POST .../replay?identifier_key=...&max=1000`, `event:replay`). After replay show the async "processing — refresh in a few seconds" affordance.
 
 ### 2c. Customer 360 — [screens/06-customer-360](screens/05-customer-360.md)
+
 - Search: `GET .../profiles?email=...` OR `?phone=...` (`profile:read`, `400` if neither); detail by `GET .../profiles/{canonicalUserID}`.
 - Tabs: Overview (`traits_json` + `computed_attributes_json`), Identity (cluster + identifiers `GET .../profiles/{cuid}/identifiers`; merge history TBD — see gaps), Events, Segments (memberships), **Consent**.
 - **Consent editor** (channel × purpose): `GET .../profiles/{cuid}/consent` (`profile:read`), `PUT .../consent` (`consent:write`, body `{channel, purpose, status, source?}`). Channels `email, sms, push, ads, webhook`; purposes `marketing, analytics, personalization, transactional`; statuses `granted, denied, unknown`.
 - **PII masking throughout**: render values as received; if a value looks masked and the role lacks `pii:read`, show a lock tooltip "unmask requires pii:read". Never attempt client-side unmasking.
 
 ### 2d. Segments + Rule Builder — [screens/07-segments](screens/06-segments-and-rule-builder.md)
+
 - List segments (**TBD — list endpoint not confirmed**, likely `GET .../segments`; see [Backend gaps](10-backend-gaps-and-caveats.md)); create (`POST .../segments`, `segment:write`, body `{name, description?, rule}` → `201`); edit (`PUT .../segments/{segmentID}` — creates a NEW version); members (`GET .../segments/{segmentID}/members`); wired destinations (`GET .../segments/{segmentID}/destinations`).
 - Delete/deactivate (`DELETE .../segments/{segmentID}`) — **code-only, NOT in openapi.yaml**; Orval won't generate it, add the hook by hand.
 - **Rule Builder**: nested `and`/`or`/`not` (`RuleNode`) over `RuleLeaf` (`field`, `op`, `value`). Ops: `eq, neq, gt, gte, lt, lte, contains, not_contains, in, not_in, exists, not_exists` (`in/not_in` take arrays; `exists/not_exists` take no value). Field picker namespaces: `profile.traits.*`, `profile.computed_attributes.*`, `profile.canonical_user_id`, `profile.first_seen_at`, `profile.last_seen_at`, `event.event_name`, `event.type`, `event.properties.*`, `event.context.*`. Validate the tree client-side with **Zod**; the server also validates on create/edit → surface `bad_request` errors.
@@ -188,6 +200,7 @@ function RuleEditor({ node, onChange }: { node: Rule; onChange: (r: Rule) => voi
 ```
 
 ### 2e. Activation / Destinations — [screens/08-activation](screens/07-activation-destinations.md)
+
 - Create destination (`POST .../destinations`, `destination:write`, body `{type:"webhook"|"kafka", name, secret?, channel?, purpose?, config}` → `201`). Webhook `config`: `{url, method?, headers?, timeout_ms?, max_retries?}` + top-level `secret` (HMAC). Kafka `config`: `{topic}`. If a `secret` is supplied it is returned to the operator via `OneTimeSecretDialog` (server never returns it again).
 - Detail/edit (`GET`/`PUT .../destinations/{destinationID}`, e.g. disable via `ConfirmDialog`).
 - Subscribe to segment (`POST .../destinations/{destinationID}/subscriptions`, `{trigger_type:"segment_membership", segment_id}`); unsubscribe (`DELETE .../subscriptions/{subscriptionID}`, idempotent soft-disable).
@@ -195,9 +208,11 @@ function RuleEditor({ node, onChange }: { node: Rule; onChange: (r: Rule) => voi
 - Only `webhook` and `kafka` are enabled; `push, email, crm, ads, warehouse` are shown disabled ("coming soon") — see Phase 4.
 
 ### Dependencies
+
 Phase 1 (shell, RBAC, tenant path). 2b→2c→2d→2e are sequential for the demo (need data flowing); requires `make run-worker`.
 
 ### Acceptance checklist
+
 - [ ] Create a source, copy the one-time `cdp_` key, and the key cannot be viewed again.
 - [ ] Events table paginates via cursor (`next_cursor`) in server mode; filters by `identifier_key`/`event_name` work.
 - [ ] Replaying an event shows the async processing notice; after the worker runs + refresh, a profile is found by email/phone.
@@ -213,6 +228,7 @@ Phase 1 (shell, RBAC, tenant path). 2b→2c→2d→2e are sequential for the dem
 **Goal:** the operator surfaces for running the platform: failure recovery, token/role/tenant administration, GDPR flows, and a dashboard.
 
 ### Deliverables
+
 - **DLQ admin** — [screens/09-dlq](screens/08-dlq-admin.md): `GET .../dlq?status=open|retried|discarded` (`dlq:read`, default limit 100, max 500, `failed_at DESC`); retry (`POST .../dlq/{id}/retry`, `dlq:retry`); discard (`POST .../dlq/{id}/discard`, **also `dlq:retry`**) behind `ConfirmDialog`; `JsonViewer` for `original_payload`. Filter-only list → client-mode Data Grid. No export / mark-resolved exists (gap).
 - **Administration** — [screens/10-administration](screens/09-administration.md):
   - Admin tokens: mint (`POST /admin/v1/admin-tokens`, `admin:write`, body `{name, role, tenant_id}` → `{api_token, role}`, plaintext `cdpadm_` shown ONCE via `OneTimeSecretDialog`). `SUPER_ADMIN` mints any role/tenant; `TENANT_ADMIN` mints only non-super roles for its own tenant.
@@ -222,9 +238,11 @@ Phase 1 (shell, RBAC, tenant path). 2b→2c→2d→2e are sequential for the dem
 - **Dashboard** — [screens/03-dashboard](screens/02-dashboard.md): health (`GET /healthz`, `/readyz`), DLQ open count, activation success rate, processing-lag indicator, quick actions. `/metrics` is **Prometheus text, not JSON** → embed/link Grafana (`:3000` via the docker stack) rather than parsing.
 
 ### Dependencies
+
 Phase 2 (Data Grid wrapper, `ConfirmDialog`, `OneTimeSecretDialog`, Customer 360 for GDPR, role→perm table).
 
 ### Acceptance checklist
+
 - [ ] DLQ lists by status; retry moves an item to `retried`; discard requires confirm and moves to `discarded`.
 - [ ] Minting an admin token shows the `cdpadm_` value once and never again; `TENANT_ADMIN` cannot mint super roles or other tenants.
 - [ ] Super-admin can create a tenant and mint its first `TENANT_ADMIN` token; non-super roles cannot see the Tenants surface.
@@ -238,14 +256,17 @@ Phase 2 (Data Grid wrapper, `ConfirmDialog`, `OneTimeSecretDialog`, Customer 360
 **Goal:** ship the specs and disabled scaffolding for work that cannot complete today, clearly labeled so nothing looks broken.
 
 ### Deliverables
+
 - **Audit log** — [screens/11-audit](screens/10-audit-log.md): **blocked** on a new backend `GET .../audit` endpoint (the `audit:read` permission exists but there is no read route; `actor_id` is not populated). Build the screen spec + a visible "requires backend endpoint" banner and the intended table columns (actor, action, resource, before/after diff, ip, time). Do not fabricate an endpoint. See [Backend gaps](10-backend-gaps-and-caveats.md).
 - **Stateful segmentation "behavior" leaves** (Level 3): implement the `BehaviorLeaf` variant (`kind: count|frequency|recency|absence|sequence`, `window`, etc.) **behind a feature flag**, labeled "advanced/beta". Stateless (Level 1/2) rules remain the default/shipped path; the backend has no time-window rules yet — keep gated.
 - **Deferred destination types**: render `push, email, crm, ads, warehouse` as **disabled/"coming soon"** in the destination create form. Only `webhook` and `kafka` are functional.
 
 ### Dependencies
+
 Phase 2 (Rule Builder for the behavior leaf; destination form) and Phase 3 (audit sits in the operability surface). Audit is unblocked only by backend work.
 
 ### Acceptance checklist
+
 - [ ] Audit screen renders the intended table shape with a clear "requires backend `GET .../audit`" banner and makes no call to a non-existent endpoint.
 - [ ] Behavior leaves are only reachable with the feature flag on and are labeled advanced/beta; with the flag off the Rule Builder offers only stateless leaves.
 - [ ] Deferred destination types appear disabled with a "coming soon" affordance and cannot be submitted.

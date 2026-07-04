@@ -15,32 +15,32 @@ A read-only **Role → Permission matrix** is rendered as reference so operators
 
 ## Route(s)
 
-| Route | Description |
-|---|---|
+| Route                         | Description                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------- |
 | `/t/:tenantId/administration` | Admin tokens + role→permission matrix; Tenants sub-section (super-admin only) |
 
 The Tenants sub-section is a panel/tab within the Administration route, not a separate route.
 
 ## Required permission(s)
 
-| Sub-section | Required permission | Notes |
-|---|---|---|
-| Administration section (entire) | `admin:write` | Only `SUPER_ADMIN` and `TENANT_ADMIN` hold this |
-| Mint admin token | `admin:write` | Role/tenant options constrained by minter's role (see below) |
-| Role → Permission matrix | `admin:write` | Read-only reference; visible to anyone who can see the section |
-| Tenants sub-section | `SUPER_ADMIN` | Cross-tenant capability; `TENANT_ADMIN` must NOT see it |
+| Sub-section                     | Required permission | Notes                                                          |
+| ------------------------------- | ------------------- | -------------------------------------------------------------- |
+| Administration section (entire) | `admin:write`       | Only `SUPER_ADMIN` and `TENANT_ADMIN` hold this                |
+| Mint admin token                | `admin:write`       | Role/tenant options constrained by minter's role (see below)   |
+| Role → Permission matrix        | `admin:write`       | Read-only reference; visible to anyone who can see the section |
+| Tenants sub-section             | `SUPER_ADMIN`       | Cross-tenant capability; `TENANT_ADMIN` must NOT see it        |
 
 `pii:read`, `admin:write`, and `profile:delete` are ONLY held by `SUPER_ADMIN` / `TENANT_ADMIN` (see [Auth & RBAC](../05-auth-rbac-tenancy.md) and the matrix below). Compute the current role's permissions from the client-side role→permission table — there is no admin `whoami` endpoint, so the operator's declared role is the source of truth for gating (see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)).
 
 ## API calls used (exact paths)
 
-| Action | Method & path | Permission | Request body | Response |
-|---|---|---|---|---|
-| Mint admin token | `POST /admin/v1/admin-tokens` | `admin:write` | `{ name, role, tenant_id }` | `{ api_token, role }` — plaintext `cdpadm_...` shown **ONCE** |
-| Create tenant | `POST /admin/v1/tenants` | `SUPER_ADMIN` only | `{ name }` | `{ id, name, status, created_at, updated_at }` |
-| List admin tokens | TBD — no endpoint confirmed | `admin:write` | — | **TBD — backend gap** |
-| Revoke admin token | TBD — no endpoint confirmed | `admin:write` | — | **TBD — backend gap** |
-| List tenants | TBD — no endpoint confirmed | `SUPER_ADMIN` | — | **TBD — backend gap** |
+| Action             | Method & path                 | Permission         | Request body                | Response                                                      |
+| ------------------ | ----------------------------- | ------------------ | --------------------------- | ------------------------------------------------------------- |
+| Mint admin token   | `POST /admin/v1/admin-tokens` | `admin:write`      | `{ name, role, tenant_id }` | `{ api_token, role }` — plaintext `cdpadm_...` shown **ONCE** |
+| Create tenant      | `POST /admin/v1/tenants`      | `SUPER_ADMIN` only | `{ name }`                  | `{ id, name, status, created_at, updated_at }`                |
+| List admin tokens  | TBD — no endpoint confirmed   | `admin:write`      | —                           | **TBD — backend gap**                                         |
+| Revoke admin token | TBD — no endpoint confirmed   | `admin:write`      | —                           | **TBD — backend gap**                                         |
+| List tenants       | TBD — no endpoint confirmed   | `SUPER_ADMIN`      | —                           | **TBD — backend gap**                                         |
 
 All admin requests send `Authorization: Bearer <adminToken>`. See [API integration](../04-api-integration.md) for the Axios interceptor and `tenantPath()` helper.
 
@@ -74,7 +74,7 @@ Shared components: `PageHeader`, `OneTimeSecretDialog`, `ConfirmDialog`, `DataGr
 // features/administration/MintTokenDialog.tsx
 const schema = z.object({
   name: z.string().min(1),
-  role: z.enum(['SUPER_ADMIN','TENANT_ADMIN','MARKETER','ANALYST','OPERATOR','VIEWER']),
+  role: z.enum(['SUPER_ADMIN', 'TENANT_ADMIN', 'MARKETER', 'ANALYST', 'OPERATOR', 'VIEWER']),
   tenant_id: z.string().uuid(),
 });
 
@@ -85,12 +85,12 @@ function MintTokenDialog() {
 
   // TENANT_ADMIN: non-super roles only, tenant pinned to own tenant
   const roleOptions: AdminRole[] = isSuper
-    ? ['SUPER_ADMIN','TENANT_ADMIN','MARKETER','ANALYST','OPERATOR','VIEWER']
-    : ['TENANT_ADMIN','MARKETER','ANALYST','OPERATOR','VIEWER'];
+    ? ['SUPER_ADMIN', 'TENANT_ADMIN', 'MARKETER', 'ANALYST', 'OPERATOR', 'VIEWER']
+    : ['TENANT_ADMIN', 'MARKETER', 'ANALYST', 'OPERATOR', 'VIEWER'];
 
   const mint = useMutation({
     mutationFn: (body: { name: string; role: AdminRole; tenant_id: string }) =>
-      api.post<AdminTokenOnce>('/admin/v1/admin-tokens', body).then(r => r.data),
+      api.post<AdminTokenOnce>('/admin/v1/admin-tokens', body).then((r) => r.data),
     onSuccess: (once) => openOneTimeSecret(once.api_token), // prefix cdpadm_
   });
 
@@ -116,18 +116,28 @@ Use the canonical types from [Data model & types](../07-data-model-and-types.md)
 
 ```ts
 export interface AdminToken {
-  id: string; name: string; role: AdminRole;
-  tenant_id: string | null; status: 'active'; created_at?: string;
+  id: string;
+  name: string;
+  role: AdminRole;
+  tenant_id: string | null;
+  status: 'active';
+  created_at?: string;
 }
-export interface AdminTokenOnce { api_token: string; role: AdminRole; } // plaintext once (prefix cdpadm_)
+export interface AdminTokenOnce {
+  api_token: string;
+  role: AdminRole;
+} // plaintext once (prefix cdpadm_)
 
 export interface Tenant {
-  id: string; name: string; status: 'active';
-  created_at: string; updated_at: string;
+  id: string;
+  name: string;
+  status: 'active';
+  created_at: string;
+  updated_at: string;
 }
 
 export type AdminRole =
-  | 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'MARKETER' | 'ANALYST' | 'OPERATOR' | 'VIEWER';
+  'SUPER_ADMIN' | 'TENANT_ADMIN' | 'MARKETER' | 'ANALYST' | 'OPERATOR' | 'VIEWER';
 ```
 
 `AdminToken.status` is `'active'` server-side (a status column exists), but there is **no confirmed list/revoke endpoint** to surface or change it — see TBD notes below.
@@ -140,14 +150,14 @@ Render this exactly as a reference table so operators understand scopes before m
 
 **Read set** = `source:read, event:read, profile:read, segment:read, destination:read, activation:read, audit:read, dlq:read`.
 
-| Role | Permissions |
-|---|---|
-| `SUPER_ADMIN` | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
-| `TENANT_ADMIN` | ALL permissions, scoped to its own tenant |
-| `MARKETER` | read set + `segment:write`, `destination:write`, `consent:write` |
-| `ANALYST` | read set only |
-| `OPERATOR` | read set + `dlq:retry`, `event:replay` |
-| `VIEWER` | read set only |
+| Role           | Permissions                                                      |
+| -------------- | ---------------------------------------------------------------- |
+| `SUPER_ADMIN`  | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
+| `TENANT_ADMIN` | ALL permissions, scoped to its own tenant                        |
+| `MARKETER`     | read set + `segment:write`, `destination:write`, `consent:write` |
+| `ANALYST`      | read set only                                                    |
+| `OPERATOR`     | read set + `dlq:retry`, `event:replay`                           |
+| `VIEWER`       | read set only                                                    |
 
 Notes: `pii:read`, `admin:write`, `profile:delete` are ONLY in `SUPER_ADMIN` / `TENANT_ADMIN`.
 
@@ -157,23 +167,23 @@ Implement as a read-only component (e.g. a Data Grid or static table) driven by 
 
 ## States (loading / empty / error)
 
-| State | Admin Tokens | Tenants |
-|---|---|---|
-| Loading | Skeleton rows in the Data Grid (once a list endpoint exists) | Skeleton rows |
-| Empty | **Blocked/TBD**: no list endpoint → show `EmptyState` "Listing tokens requires a backend `GET .../admin-tokens` endpoint" with a link to [Backend gaps & caveats](../10-backend-gaps-and-caveats.md). Minting still works. | **Blocked/TBD**: no list endpoint → same treatment for tenants |
-| Error | `ErrorState` with retry; map `{error:{code,message}}` — `403` toast (permission/tenant scope), `401` → clear token + redirect `/connect` | Same |
-| Mint success | `OneTimeSecretDialog` opens with `api_token` (copy-once, "you cannot see this again") | After create, show tenant summary + optional "mint TENANT_ADMIN token" |
-| Mint in-flight | Disable submit, show spinner | Disable submit, show spinner |
-| Validation error | Server `bad_request` mapped to fields or a form-level alert | Same |
+| State            | Admin Tokens                                                                                                                                                                                                               | Tenants                                                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Loading          | Skeleton rows in the Data Grid (once a list endpoint exists)                                                                                                                                                               | Skeleton rows                                                          |
+| Empty            | **Blocked/TBD**: no list endpoint → show `EmptyState` "Listing tokens requires a backend `GET .../admin-tokens` endpoint" with a link to [Backend gaps & caveats](../10-backend-gaps-and-caveats.md). Minting still works. | **Blocked/TBD**: no list endpoint → same treatment for tenants         |
+| Error            | `ErrorState` with retry; map `{error:{code,message}}` — `403` toast (permission/tenant scope), `401` → clear token + redirect `/connect`                                                                                   | Same                                                                   |
+| Mint success     | `OneTimeSecretDialog` opens with `api_token` (copy-once, "you cannot see this again")                                                                                                                                      | After create, show tenant summary + optional "mint TENANT_ADMIN token" |
+| Mint in-flight   | Disable submit, show spinner                                                                                                                                                                                               | Disable submit, show spinner                                           |
+| Validation error | Server `bad_request` mapped to fields or a form-level alert                                                                                                                                                                | Same                                                                   |
 
 ## Actions & confirmations
 
-| Action | Trigger | Confirmation | Result |
-|---|---|---|---|
-| Mint admin token | "Mint token" → dialog | None to submit; success opens `OneTimeSecretDialog` (must confirm to close) | New `cdpadm_...` token shown once |
-| Create tenant (super-admin) | "Create tenant" → dialog | None to submit | New `Tenant`; offer to chain token mint |
-| Hand-off token | Post-mint | `OneTimeSecretDialog` requires explicit confirm before closing | Operator copies token; value is unrecoverable afterward |
-| Revoke / disable token | **TBD — backend gap** | Would need `ConfirmDialog` | Document intended UI; blocked on endpoint (link docs/10) |
+| Action                      | Trigger                  | Confirmation                                                                | Result                                                   |
+| --------------------------- | ------------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Mint admin token            | "Mint token" → dialog    | None to submit; success opens `OneTimeSecretDialog` (must confirm to close) | New `cdpadm_...` token shown once                        |
+| Create tenant (super-admin) | "Create tenant" → dialog | None to submit                                                              | New `Tenant`; offer to chain token mint                  |
+| Hand-off token              | Post-mint                | `OneTimeSecretDialog` requires explicit confirm before closing              | Operator copies token; value is unrecoverable afterward  |
+| Revoke / disable token      | **TBD — backend gap**    | Would need `ConfirmDialog`                                                  | Document intended UI; blocked on endpoint (link docs/10) |
 
 **One-time secret handling:** the minted `api_token` is returned plaintext exactly once. Always route it through `OneTimeSecretDialog` (big copy button, explicit "this value cannot be retrieved again" warning, confirm-to-close). Never log it, never persist it, never place it in a query cache that could be re-read.
 

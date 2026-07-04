@@ -41,17 +41,17 @@ src/
 
 Directory responsibilities:
 
-| Dir | Responsibility |
-|---|---|
-| `app/` | Composition root. Wires providers, router, theme, and the persistent layout chrome. No feature logic. |
-| `lib/api/` | The single Axios instance, request/response interceptors, and the Orval-generated client + React Query hooks. All network I/O originates here. |
-| `lib/auth/` | Holds the pasted admin token, the declared role, the canonical **role→permission table**, `useAuth`, and the `<RequirePerm>` gate component. There is **no login** — token entry only (token-only auth). |
-| `lib/tenant/` | Holds the current `{tenantID}` UUID; exposes `useTenant`; drives the tenant switcher (all tenants for `SUPER_ADMIN`, pinned for others). |
-| `lib/query/` | Configures the shared `QueryClient`, exposes the `qk` query-key factory (§5), and centralizes error handling. |
-| `lib/format/` | Pure display helpers: relative timestamps, and masking-aware rendering (never unmasks — see [Backend gaps & caveats](10-backend-gaps-and-caveats.md)). |
-| `features/*` | Self-contained surfaces. Each owns its routes, components, TanStack Query hooks, Zod schemas, and `__tests__`. Features import from `lib/` and `components/`, never from each other's internals. |
-| `components/` | Reusable, feature-agnostic UI primitives shared across surfaces. |
-| `types/` | Hand-written entity types from [Data model & types](07-data-model-and-types.md) that fill gaps in the Orval-generated output. |
+| Dir           | Responsibility                                                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`        | Composition root. Wires providers, router, theme, and the persistent layout chrome. No feature logic.                                                                                                    |
+| `lib/api/`    | The single Axios instance, request/response interceptors, and the Orval-generated client + React Query hooks. All network I/O originates here.                                                           |
+| `lib/auth/`   | Holds the pasted admin token, the declared role, the canonical **role→permission table**, `useAuth`, and the `<RequirePerm>` gate component. There is **no login** — token entry only (token-only auth). |
+| `lib/tenant/` | Holds the current `{tenantID}` UUID; exposes `useTenant`; drives the tenant switcher (all tenants for `SUPER_ADMIN`, pinned for others).                                                                 |
+| `lib/query/`  | Configures the shared `QueryClient`, exposes the `qk` query-key factory (§5), and centralizes error handling.                                                                                            |
+| `lib/format/` | Pure display helpers: relative timestamps, and masking-aware rendering (never unmasks — see [Backend gaps & caveats](10-backend-gaps-and-caveats.md)).                                                   |
+| `features/*`  | Self-contained surfaces. Each owns its routes, components, TanStack Query hooks, Zod schemas, and `__tests__`. Features import from `lib/` and `components/`, never from each other's internals.         |
+| `components/` | Reusable, feature-agnostic UI primitives shared across surfaces.                                                                                                                                         |
+| `types/`      | Hand-written entity types from [Data model & types](07-data-model-and-types.md) that fill gaps in the Orval-generated output.                                                                            |
 
 ---
 
@@ -175,14 +175,14 @@ The `/t/:tenantId` layout route is the single place tenant context is establishe
 
 State is split by **who owns the source of truth**. No Redux.
 
-| State kind | Owner | Notes |
-|---|---|---|
-| **Server state** (all API reads/writes) | **TanStack Query v5** | The cache is the source of truth for anything from the backend. Query-key factory keyed by tenant (§5). Mutations invalidate keys. Events list uses `useInfiniteQuery` with `next_cursor`. |
-| **Auth token + declared role** | **React context** (`AuthProvider` in `lib/auth`) | Pasted admin Bearer token, persisted; no session/JWT/refresh. Read by the Axios request interceptor. |
-| **Current tenant** | **React context** (`TenantProvider` in `lib/tenant`) | Set from the `:tenantId` route param at the layout route. |
-| **Theme (light/dark)** | **React context** + `localStorage` | MUI theme toggle; preference persisted. |
-| **Form state** | **React Hook Form v7** + **Zod** (via `@hookform/resolvers`) | Local to each form; inline field errors; server `bad_request` mapped to fields or a form-level alert. |
-| **Ephemeral UI state** (dialog open, tab index) | Local `useState` | Component-local only. |
+| State kind                                      | Owner                                                        | Notes                                                                                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Server state** (all API reads/writes)         | **TanStack Query v5**                                        | The cache is the source of truth for anything from the backend. Query-key factory keyed by tenant (§5). Mutations invalidate keys. Events list uses `useInfiniteQuery` with `next_cursor`. |
+| **Auth token + declared role**                  | **React context** (`AuthProvider` in `lib/auth`)             | Pasted admin Bearer token, persisted; no session/JWT/refresh. Read by the Axios request interceptor.                                                                                       |
+| **Current tenant**                              | **React context** (`TenantProvider` in `lib/tenant`)         | Set from the `:tenantId` route param at the layout route.                                                                                                                                  |
+| **Theme (light/dark)**                          | **React context** + `localStorage`                           | MUI theme toggle; preference persisted.                                                                                                                                                    |
+| **Form state**                                  | **React Hook Form v7** + **Zod** (via `@hookform/resolvers`) | Local to each form; inline field errors; server `bad_request` mapped to fields or a form-level alert.                                                                                      |
+| **Ephemeral UI state** (dialog open, tab index) | Local `useState`                                             | Component-local only.                                                                                                                                                                      |
 
 - **Zustand is optional** — reach for it **only if** the token/tenant/theme contexts prove insufficient. Default to React context + hooks.
 - **No Redux**, no global client store for server data — TanStack Query already owns that.
@@ -213,8 +213,7 @@ export const qk = {
     members: (segmentId: string) => ['t', tenantId, 'segments', segmentId, 'members'] as const,
   }),
   dlq: (tenantId: string) => ({
-    list: (status: 'open' | 'retried' | 'discarded') =>
-      ['t', tenantId, 'dlq', status] as const,
+    list: (status: 'open' | 'retried' | 'discarded') => ['t', tenantId, 'dlq', status] as const,
   }),
 } as const;
 
@@ -234,11 +233,21 @@ export const qk = {
 
 ```tsx
 // app/providers.tsx (illustrative)
-<QueryClientProvider client={queryClient}>   {/* server-state cache */}
-  <ThemeProvider theme={theme}>              {/* MUI theme + CssBaseline (light/dark) */}
-    <SnackbarProvider>                       {/* notistack toasts */}
-      <AuthProvider>                         {/* token + declared role; feeds Axios interceptor */}
-        <TenantProvider>                     {/* current tenant; set at /t/:tenantId layout route */}
+<QueryClientProvider client={queryClient}>
+  {' '}
+  {/* server-state cache */}
+  <ThemeProvider theme={theme}>
+    {' '}
+    {/* MUI theme + CssBaseline (light/dark) */}
+    <SnackbarProvider>
+      {' '}
+      {/* notistack toasts */}
+      <AuthProvider>
+        {' '}
+        {/* token + declared role; feeds Axios interceptor */}
+        <TenantProvider>
+          {' '}
+          {/* current tenant; set at /t/:tenantId layout route */}
           <RouterProvider router={router} /> {/* React Router data router */}
         </TenantProvider>
       </AuthProvider>

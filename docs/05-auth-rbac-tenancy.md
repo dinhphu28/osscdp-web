@@ -19,10 +19,10 @@ There is **NO user login, NO username/password, NO session, NO JWT, NO users tab
 
 ### Two kinds of admin token
 
-| Token | Origin | Role | Scope |
-|---|---|---|---|
-| **Static bootstrap token** | Backend env `ADMIN_API_TOKEN` | `SUPER_ADMIN` | Cross-tenant (tenant = nil) |
-| **Minted token** | `POST /admin/v1/admin-tokens` (prefix `cdpadm_...`) | Any role (per mint) | Pinned to one `tenant_id` (except super) |
+| Token                      | Origin                                              | Role                | Scope                                    |
+| -------------------------- | --------------------------------------------------- | ------------------- | ---------------------------------------- |
+| **Static bootstrap token** | Backend env `ADMIN_API_TOKEN`                       | `SUPER_ADMIN`       | Cross-tenant (tenant = nil)              |
+| **Minted token**           | `POST /admin/v1/admin-tokens` (prefix `cdpadm_...`) | Any role (per mint) | Pinned to one `tenant_id` (except super) |
 
 > Do not confuse admin tokens with **source API keys** (prefix `cdp_...`). Source keys authenticate the ingress API only; the admin console never authenticates with them — it only provisions them for hand-off. See [API integration](04-api-integration.md).
 
@@ -39,9 +39,9 @@ There is **NO user login, NO username/password, NO session, NO JWT, NO users tab
 // lib/auth/AuthProvider.tsx (illustrative)
 interface AuthState {
   token: string | null;
-  role: AdminRole;            // declared at /connect (see §3)
+  role: AdminRole; // declared at /connect (see §3)
   connect: (token: string, role: AdminRole, baseUrl?: string) => void;
-  disconnect: () => void;     // clears token (memory + sessionStorage) → navigate('/connect')
+  disconnect: () => void; // clears token (memory + sessionStorage) → navigate('/connect')
 }
 ```
 
@@ -71,14 +71,14 @@ Consequences and the required approach:
 
 ### Role → permission table
 
-| Role | Permissions |
-|---|---|
-| `SUPER_ADMIN` | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
-| `TENANT_ADMIN` | ALL permissions, scoped to its own tenant |
-| `MARKETER` | read set + `segment:write`, `destination:write`, `consent:write` |
-| `ANALYST` | read set only |
-| `OPERATOR` | read set + `dlq:retry`, `event:replay` |
-| `VIEWER` | read set only |
+| Role           | Permissions                                                      |
+| -------------- | ---------------------------------------------------------------- |
+| `SUPER_ADMIN`  | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
+| `TENANT_ADMIN` | ALL permissions, scoped to its own tenant                        |
+| `MARKETER`     | read set + `segment:write`, `destination:write`, `consent:write` |
+| `ANALYST`      | read set only                                                    |
+| `OPERATOR`     | read set + `dlq:retry`, `event:replay`                           |
+| `VIEWER`       | read set only                                                    |
 
 Notes: `pii:read`, `admin:write`, `profile:delete` are ONLY in `SUPER_ADMIN` / `TENANT_ADMIN`. Note also that **`dlq:retry` covers discard** (both DLQ retry and discard actions are gated on `dlq:retry`).
 
@@ -87,23 +87,36 @@ Notes: `pii:read`, `admin:write`, `profile:delete` are ONLY in `SUPER_ADMIN` / `
 ```ts
 // lib/auth/permissions.ts
 const READ_SET: Permission[] = [
-  'source:read', 'event:read', 'profile:read', 'segment:read',
-  'destination:read', 'activation:read', 'audit:read', 'dlq:read',
+  'source:read',
+  'event:read',
+  'profile:read',
+  'segment:read',
+  'destination:read',
+  'activation:read',
+  'audit:read',
+  'dlq:read',
 ];
 
 const ALL: Permission[] = [
-  ...READ_SET, 'source:write', 'event:replay', 'profile:delete',
-  'segment:write', 'destination:write', 'dlq:retry', 'consent:write',
-  'pii:read', 'admin:write',
+  ...READ_SET,
+  'source:write',
+  'event:replay',
+  'profile:delete',
+  'segment:write',
+  'destination:write',
+  'dlq:retry',
+  'consent:write',
+  'pii:read',
+  'admin:write',
 ];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
-  SUPER_ADMIN:  ALL,
+  SUPER_ADMIN: ALL,
   TENANT_ADMIN: ALL,
-  MARKETER:     [...READ_SET, 'segment:write', 'destination:write', 'consent:write'],
-  ANALYST:      READ_SET,
-  OPERATOR:     [...READ_SET, 'dlq:retry', 'event:replay'],
-  VIEWER:       READ_SET,
+  MARKETER: [...READ_SET, 'segment:write', 'destination:write', 'consent:write'],
+  ANALYST: READ_SET,
+  OPERATOR: [...READ_SET, 'dlq:retry', 'event:replay'],
+  VIEWER: READ_SET,
 };
 ```
 
@@ -134,8 +147,14 @@ Wrap actions (buttons, menu items) in `<RequirePerm perm="...">`. Default behavi
 ```tsx
 // lib/auth/RequirePerm.tsx (illustrative)
 export function RequirePerm({
-  perm, hide = false, children,
-}: { perm: Permission; hide?: boolean; children: React.ReactElement }) {
+  perm,
+  hide = false,
+  children,
+}: {
+  perm: Permission;
+  hide?: boolean;
+  children: React.ReactElement;
+}) {
   const { has } = usePermissions();
   if (has(perm)) return children;
   if (hide) return null;
@@ -178,10 +197,10 @@ export function useTenant() {
 
 ### Tenant switcher
 
-| Declared role | Switcher behavior |
-|---|---|
-| `SUPER_ADMIN` (tenant nil) | Cross-tenant → show a switcher listing all tenants |
-| All other roles | Pinned to one tenant → switcher shows only that tenant, or is hidden |
+| Declared role              | Switcher behavior                                                    |
+| -------------------------- | -------------------------------------------------------------------- |
+| `SUPER_ADMIN` (tenant nil) | Cross-tenant → show a switcher listing all tenants                   |
+| All other roles            | Pinned to one tenant → switcher shows only that tenant, or is hidden |
 
 **Super-admin tenant list:** there is **no confirmed "list tenants" (`GET /admin/v1/tenants`) endpoint** in the spec extract — only `POST /admin/v1/tenants` (create). Mark as **TBD — backend gap** (see [Backend gaps & caveats](10-backend-gaps-and-caveats.md)). Until confirmed, the super-admin switcher must support **manual tenant-ID entry** (paste a UUID) in addition to any list it can populate.
 
@@ -209,7 +228,9 @@ function PiiValue({ value }: { value: string }) {
     <span>
       {value}
       {looksMasked && !has('pii:read') && (
-        <Tooltip title="unmask requires pii:read"><LockIcon fontSize="inherit" /></Tooltip>
+        <Tooltip title="unmask requires pii:read">
+          <LockIcon fontSize="inherit" />
+        </Tooltip>
       )}
     </span>
   );
@@ -222,9 +243,9 @@ function PiiValue({ value }: { value: string }) {
 
 - **Token transport:** the admin token goes in the `Authorization: Bearer <token>` header — **never a cookie**. Backend CORS sets `AllowCredentials: false`, so cookie-based auth is impossible; allowed headers include `Authorization, Content-Type, Accept, X-Api-Key`. See the CORS note in [API integration](04-api-integration.md).
 - **Storage trade-off:**
-  - *In-memory only* — safest (no persistence surface), but the token is lost on refresh/new tab (user must re-paste).
-  - *`sessionStorage`* — survives refresh within the tab, cleared when the tab closes; readable by any script on the origin (XSS risk).
-  - *`localStorage`* — **do not use**; persists indefinitely and maximizes XSS exposure.
+  - _In-memory only_ — safest (no persistence surface), but the token is lost on refresh/new tab (user must re-paste).
+  - _`sessionStorage`_ — survives refresh within the tab, cleared when the tab closes; readable by any script on the origin (XSS risk).
+  - _`localStorage`_ — **do not use**; persists indefinitely and maximizes XSS exposure.
   - **Recommendation:** in-memory primary store, optionally mirrored to **`sessionStorage`** for refresh survival. Document the XSS trade-off to the operator.
 - **XSS warning:** because the token grants full admin capability and is reachable from JS when stored, keep dependencies audited, avoid `dangerouslySetInnerHTML`, and sanitize any rendered JSON payloads (use the `JsonViewer` component, not raw HTML).
 - **One-time secrets:** admin tokens (`cdpadm_...`), source keys (`cdp_...`), and destination secrets are shown in plaintext **exactly once** at creation/rotation via `OneTimeSecretDialog`. They cannot be retrieved again — warn explicitly. (Detailed in the relevant screen docs.)

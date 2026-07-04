@@ -8,24 +8,24 @@ Operators use this screen to answer "did event X arrive, what did it contain, an
 
 - A **keyset-paginated** table of raw ingested events, filterable by identifier and event name.
 - A **payload JSON viewer** plus event metadata (type, source, timestamps, processing status, error reason).
-- **Replay** actions: replay a single event, or replay *all* events for one identifier, re-publishing them into the pipeline.
+- **Replay** actions: replay a single event, or replay _all_ events for one identifier, re-publishing them into the pipeline.
 
 Because the pipeline is **asynchronous**, replay does not produce instant results. The UI must set expectations ("republished; refresh in a few seconds") and never promise immediate downstream effects. See [App conventions](../03-architecture.md) and [API integration](../04-api-integration.md).
 
 ## Route(s)
 
-| Route | Screen |
-|---|---|
+| Route                 | Screen                                      |
+| --------------------- | ------------------------------------------- |
 | `/t/:tenantId/events` | Events explorer table + detail drawer/panel |
 
 There is no separate detail route; selecting a row opens the payload/metadata inside a side panel or drawer on the same route. (A row selection may be reflected in a query param, e.g. `?eventId=...`, but this is optional.)
 
 ## Required permission(s)
 
-| Action | Permission |
-|---|---|
-| View events list & detail | `event:read` |
-| Replay one event | `event:replay` |
+| Action                              | Permission     |
+| ----------------------------------- | -------------- |
+| View events list & detail           | `event:read`   |
+| Replay one event                    | `event:replay` |
 | Replay all events for an identifier | `event:replay` |
 
 Roles holding `event:read`: all roles (it is in the read set). Roles holding `event:replay`: `SUPER_ADMIN`, `TENANT_ADMIN`, `OPERATOR`. `MARKETER`, `ANALYST`, and `VIEWER` can view but **cannot replay** — hide/disable replay actions for them. See [RBAC](../05-auth-rbac-tenancy.md).
@@ -34,12 +34,12 @@ Roles holding `event:read`: all roles (it is in the read set). Roles holding `ev
 
 All paths are tenant-scoped; build with `tenantPath(tenantId, suffix)` → `/admin/v1/tenants/${tenantId}${suffix}`.
 
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| `GET` | `/admin/v1/tenants/{tenantID}/events` | `event:read` | **Keyset pagination**. Query: `limit` (default 50, max 500), `cursor` (opaque), filters `identifier_key` (e.g. `user_id:u1`), `event_name`. Response `{ events: RawEvent[], next_cursor: string }`. |
-| `GET` | `/admin/v1/tenants/{tenantID}/events/{eventID}` | `event:read` | Fetch a single event's full detail. |
-| `POST` | `/admin/v1/tenants/{tenantID}/events/{eventID}/replay` | `event:replay` | Re-publish one event into the pipeline. |
-| `POST` | `/admin/v1/tenants/{tenantID}/replay?identifier_key=...&max=1000` | `event:replay` | Replay **all** events for an identifier. `identifier_key` e.g. `user_id:u1`; `max` caps the batch (default `1000`). |
+| Method | Path                                                              | Permission     | Notes                                                                                                                                                                                               |
+| ------ | ----------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/admin/v1/tenants/{tenantID}/events`                             | `event:read`   | **Keyset pagination**. Query: `limit` (default 50, max 500), `cursor` (opaque), filters `identifier_key` (e.g. `user_id:u1`), `event_name`. Response `{ events: RawEvent[], next_cursor: string }`. |
+| `GET`  | `/admin/v1/tenants/{tenantID}/events/{eventID}`                   | `event:read`   | Fetch a single event's full detail.                                                                                                                                                                 |
+| `POST` | `/admin/v1/tenants/{tenantID}/events/{eventID}/replay`            | `event:replay` | Re-publish one event into the pipeline.                                                                                                                                                             |
+| `POST` | `/admin/v1/tenants/{tenantID}/replay?identifier_key=...&max=1000` | `event:replay` | Replay **all** events for an identifier. `identifier_key` e.g. `user_id:u1`; `max` caps the batch (default `1000`).                                                                                 |
 
 > Note: the replay-by-identifier route is `.../tenants/{tenantID}/replay` (not nested under `/events`).
 
@@ -70,9 +70,11 @@ Events are the **only** keyset-paginated resource. Do **not** use MUI's numbered
 const eventsQuery = useInfiniteQuery({
   queryKey: qk.events(tenantId).list({ identifier_key, event_name }),
   queryFn: ({ pageParam }) =>
-    api.get<KeysetPage<RawEvent>>(tenantPath(tenantId, '/events'), {
-      params: { limit: 50, cursor: pageParam, identifier_key, event_name },
-    }).then((r) => r.data),
+    api
+      .get<KeysetPage<RawEvent>>(tenantPath(tenantId, '/events'), {
+        params: { limit: 50, cursor: pageParam, identifier_key, event_name },
+      })
+      .then((r) => r.data),
   initialPageParam: undefined as string | undefined,
   // next_cursor === '' (empty) means no more pages
   getNextPageParam: (last) => last.next_cursor || undefined,
@@ -102,10 +104,10 @@ Load-more UX: the button shows a spinner while `isFetchingNextPage`; when `next_
 
 ### Filters
 
-| Filter | Query param | Input | Notes |
-|---|---|---|---|
+| Filter     | Query param      | Input                      | Notes                                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Identifier | `identifier_key` | **namespace:value picker** | Format `<namespace>:<value>`, e.g. `user_id:u1`. UI offers a namespace select (e.g. `user_id`, `email`, `anonymous_id`, `device_id`) + a value text field, then joins them with `:`. Free-text entry also allowed. Exact known namespaces: **TBD — backend gap** (see [backend gaps](../10-backend-gaps-and-caveats.md)); accept arbitrary `namespace:value`. |
-| Event name | `event_name` | text field | Exact match, e.g. `product_viewed`. |
+| Event name | `event_name`     | text field                 | Exact match, e.g. `product_viewed`.                                                                                                                                                                                                                                                                                                                           |
 
 Both filters are optional; applying either re-runs the query from the first page. Empty filters list all events (most recent first, per keyset order).
 
@@ -117,62 +119,75 @@ Types are defined in [Data model](../07-data-model-and-types.md). Reproduced her
 export type EventType = 'track' | 'identify' | 'alias';
 
 export interface RawEvent {
-  id: string; tenant_id: string; event_id: string; source_id: string;
-  type: EventType | 'batch'; event_name?: string; identifier_key?: string;
-  payload_json: Record<string, unknown>; payload_hash?: string;
-  timestamp: string; received_at: string; processing_status: string; error_reason?: string;
+  id: string;
+  tenant_id: string;
+  event_id: string;
+  source_id: string;
+  type: EventType | 'batch';
+  event_name?: string;
+  identifier_key?: string;
+  payload_json: Record<string, unknown>;
+  payload_hash?: string;
+  timestamp: string;
+  received_at: string;
+  processing_status: string;
+  error_reason?: string;
 }
 
-export interface KeysetPage<T> { events: T[]; next_cursor: string; } // events list shape
+export interface KeysetPage<T> {
+  events: T[];
+  next_cursor: string;
+} // events list shape
 ```
 
 Field usage in this screen:
 
-| Field | Displayed as |
-|---|---|
-| `event_name` | Primary column; falls back to `type` when absent |
-| `type` | Column + metadata (`track` / `identify` / `alias` / `batch`) |
-| `source_id` | Column (copyable) + metadata |
-| `identifier_key` | Column; also the seed for replay-by-identifier |
-| `processing_status` | `StatusChip` column + metadata (raw string from backend; render defensively) |
-| `error_reason` | Metadata (shown only when present; highlight as error text) |
-| `timestamp` / `received_at` | Metadata + relative-time column |
-| `payload_json` | `JsonViewer` in detail panel |
-| `payload_hash` | Optional metadata (monospace, copyable) |
+| Field                       | Displayed as                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `event_name`                | Primary column; falls back to `type` when absent                             |
+| `type`                      | Column + metadata (`track` / `identify` / `alias` / `batch`)                 |
+| `source_id`                 | Column (copyable) + metadata                                                 |
+| `identifier_key`            | Column; also the seed for replay-by-identifier                               |
+| `processing_status`         | `StatusChip` column + metadata (raw string from backend; render defensively) |
+| `error_reason`              | Metadata (shown only when present; highlight as error text)                  |
+| `timestamp` / `received_at` | Metadata + relative-time column                                              |
+| `payload_json`              | `JsonViewer` in detail panel                                                 |
+| `payload_hash`              | Optional metadata (monospace, copyable)                                      |
 
 > `processing_status` is a free-form backend string (not a fixed enum in §4). Render whatever arrives; map known values to chip colors and default unknown values to a neutral chip.
 
 ## States (loading / empty / error)
 
-| State | Behavior |
-|---|---|
-| Loading (first page) | Data Grid skeleton / grid `loading` overlay. |
-| Loading (next page) | "Load more" button shows spinner (`isFetchingNextPage`); existing rows stay. |
-| Empty (no events) | `EmptyState`: "No events found." If filters are set, offer "Clear filters". Hint that ingest is async — recently sent events may take a few seconds to appear; provide a **Refresh** button. |
-| Detail loading | Skeleton in the detail panel while `GET .../events/{eventID}` resolves (if the row's full payload isn't already in the list response). |
-| Error | `ErrorState` with retry; parse the `{ error: { code, message } }` envelope. `401` → clear token + redirect `/connect`; `403` → toast ("requires event:read" or tenant-scope); `429` → respect `Retry-After`; others → toast. See [API integration](../04-api-integration.md). |
+| State                | Behavior                                                                                                                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading (first page) | Data Grid skeleton / grid `loading` overlay.                                                                                                                                                                                                                                  |
+| Loading (next page)  | "Load more" button shows spinner (`isFetchingNextPage`); existing rows stay.                                                                                                                                                                                                  |
+| Empty (no events)    | `EmptyState`: "No events found." If filters are set, offer "Clear filters". Hint that ingest is async — recently sent events may take a few seconds to appear; provide a **Refresh** button.                                                                                  |
+| Detail loading       | Skeleton in the detail panel while `GET .../events/{eventID}` resolves (if the row's full payload isn't already in the list response).                                                                                                                                        |
+| Error                | `ErrorState` with retry; parse the `{ error: { code, message } }` envelope. `401` → clear token + redirect `/connect`; `403` → toast ("requires event:read" or tenant-scope); `429` → respect `Retry-After`; others → toast. See [API integration](../04-api-integration.md). |
 
 ## Actions & confirmations
 
 ### Replay one event
+
 - Button in the row actions menu and in the detail panel, gated by `<RequirePerm perm="event:replay">` (hidden/disabled with tooltip "requires event:replay" for roles without it).
 - On click → `ConfirmDialog`: "Replay this event? It will be re-published into the pipeline." → `POST .../events/{eventID}/replay`.
-- On success → close dialog, show **async-pipeline banner/snackbar**: *"Event republished; refresh in a few seconds to see downstream changes."* Provide a manual **Refresh** button.
+- On success → close dialog, show **async-pipeline banner/snackbar**: _"Event republished; refresh in a few seconds to see downstream changes."_ Provide a manual **Refresh** button.
 
 ### Replay all events for an identifier
+
 - Available from a row's actions menu ("Replay all for `identifier_key`") and/or a toolbar action when an `identifier_key` filter is active.
 - `ConfirmDialog` states the identifier and the cap: "Replay up to `max` events for `user_id:u1`? This re-publishes every matching event into the pipeline." Default `max=1000` (surface/allow editing the cap).
 - Calls `POST .../replay?identifier_key=...&max=1000`.
-- On success → async-pipeline banner: *"Republished; refresh in a few seconds."*
+- On success → async-pipeline banner: _"Republished; refresh in a few seconds."_
 
 ```tsx
 const replayOne = useMutation({
-  mutationFn: (eventId: string) =>
-    api.post(tenantPath(tenantId, `/events/${eventId}/replay`)),
-  onSuccess: () => enqueueSnackbar(
-    'Event republished; refresh in a few seconds to see downstream changes.',
-    { variant: 'info' },
-  ),
+  mutationFn: (eventId: string) => api.post(tenantPath(tenantId, `/events/${eventId}/replay`)),
+  onSuccess: () =>
+    enqueueSnackbar('Event republished; refresh in a few seconds to see downstream changes.', {
+      variant: 'info',
+    }),
 });
 
 const replayByIdentifier = useMutation({

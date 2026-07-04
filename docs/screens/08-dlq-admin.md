@@ -14,21 +14,22 @@ See the [async pipeline](../03-architecture.md) and [backend gaps](../10-backend
 
 ## Route(s)
 
-| Route | Screen |
-|---|---|
+| Route              | Screen                                                               |
+| ------------------ | -------------------------------------------------------------------- |
 | `/t/:tenantId/dlq` | DLQ list + detail (single screen; row selection opens payload panel) |
 
 Nested under the `/t/:tenantId` layout route (tenant-scoped). No sub-routes.
 
 ## Required permission(s)
 
-| Capability | Permission | Roles that hold it |
-|---|---|---|
-| View DLQ list + payloads | `dlq:read` | all read-set roles (`SUPER_ADMIN`, `TENANT_ADMIN`, `MARKETER`, `ANALYST`, `OPERATOR`, `VIEWER`) |
-| Retry a DLQ event | `dlq:retry` | `SUPER_ADMIN`, `TENANT_ADMIN`, `OPERATOR` |
-| Discard a DLQ event | `dlq:retry` | `SUPER_ADMIN`, `TENANT_ADMIN`, `OPERATOR` |
+| Capability               | Permission  | Roles that hold it                                                                              |
+| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------- |
+| View DLQ list + payloads | `dlq:read`  | all read-set roles (`SUPER_ADMIN`, `TENANT_ADMIN`, `MARKETER`, `ANALYST`, `OPERATOR`, `VIEWER`) |
+| Retry a DLQ event        | `dlq:retry` | `SUPER_ADMIN`, `TENANT_ADMIN`, `OPERATOR`                                                       |
+| Discard a DLQ event      | `dlq:retry` | `SUPER_ADMIN`, `TENANT_ADMIN`, `OPERATOR`                                                       |
 
 Notes:
+
 - **Discard shares the `dlq:retry` permission** — there is no separate `dlq:discard` permission.
 - `VIEWER` and `ANALYST` are **read-only**: they can view the queue and payloads but see no
   Retry/Discard actions.
@@ -40,11 +41,11 @@ Notes:
 All paths are under `/admin/v1/tenants/{tenantID}`; build with `tenantPath(tenantId, suffix)`. See
 [API integration](../04-api-integration.md).
 
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| `GET` | `/admin/v1/tenants/{tenantID}/dlq?status=open\|retried\|discarded` | `dlq:read` | List. Default `limit` 100, max 500. Ordered `failed_at DESC`. Returns `{events:[...]}`. |
-| `POST` | `/admin/v1/tenants/{tenantID}/dlq/{id}/retry` | `dlq:retry` | Republishes the event into the pipeline → `{id, status:"retried"}`. |
-| `POST` | `/admin/v1/tenants/{tenantID}/dlq/{id}/discard` | `dlq:retry` | Marks event discarded → `{id, status:"discarded"}`. |
+| Method | Path                                                               | Permission  | Notes                                                                                   |
+| ------ | ------------------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------------- |
+| `GET`  | `/admin/v1/tenants/{tenantID}/dlq?status=open\|retried\|discarded` | `dlq:read`  | List. Default `limit` 100, max 500. Ordered `failed_at DESC`. Returns `{events:[...]}`. |
+| `POST` | `/admin/v1/tenants/{tenantID}/dlq/{id}/retry`                      | `dlq:retry` | Republishes the event into the pipeline → `{id, status:"retried"}`.                     |
+| `POST` | `/admin/v1/tenants/{tenantID}/dlq/{id}/discard`                    | `dlq:retry` | Marks event discarded → `{id, status:"discarded"}`.                                     |
 
 **No pagination cursor** — DLQ is filter-only (by `status`), returns a full array up to the limit.
 Use MUI X Data Grid in **client mode** (client-side paging/sorting), not server/keyset mode. Contrast
@@ -75,17 +76,17 @@ PageHeader  "DLQ" · "Dead-lettered pipeline events awaiting triage"
   Default selection: `open`.
 - **Data Grid** columns:
 
-  | Column | Field | Rendering |
-  |---|---|---|
-  | Failed at | `failed_at` | relative-time formatter (e.g. "3m ago"), full ISO on hover; default sort DESC |
-  | Component | `component` | plain text (pipeline stage that failed) |
-  | Error code | `error_code` | `StatusChip` (error tone) |
-  | Error message | `error_message` | truncated with ellipsis; full text in tooltip / detail panel |
-  | Event ID | `event_id` | copyable (`CopyButton`) |
-  | Source ID | `source_id` | copyable; may be absent (`source_id?`) → render "—" |
-  | Retries | `retry_count` | numeric |
-  | Status | `status` | `StatusChip` mapped from `DlqStatus` |
-  | Actions | — | Retry / Discard buttons, gated by `dlq:retry` |
+  | Column        | Field           | Rendering                                                                     |
+  | ------------- | --------------- | ----------------------------------------------------------------------------- |
+  | Failed at     | `failed_at`     | relative-time formatter (e.g. "3m ago"), full ISO on hover; default sort DESC |
+  | Component     | `component`     | plain text (pipeline stage that failed)                                       |
+  | Error code    | `error_code`    | `StatusChip` (error tone)                                                     |
+  | Error message | `error_message` | truncated with ellipsis; full text in tooltip / detail panel                  |
+  | Event ID      | `event_id`      | copyable (`CopyButton`)                                                       |
+  | Source ID     | `source_id`     | copyable; may be absent (`source_id?`) → render "—"                           |
+  | Retries       | `retry_count`   | numeric                                                                       |
+  | Status        | `status`        | `StatusChip` mapped from `DlqStatus`                                          |
+  | Actions       | —               | Retry / Discard buttons, gated by `dlq:retry`                                 |
 
 - **Row → detail:** selecting a row opens a drawer/panel showing full metadata and the
   **`original_payload`** rendered with the shared **`JsonViewer`** component.
@@ -102,14 +103,14 @@ export interface DlqEvent {
   id: string;
   tenant_id: string;
   event_id: string;
-  source_id?: string;          // may be absent
-  component: string;           // pipeline stage that failed
+  source_id?: string; // may be absent
+  component: string; // pipeline stage that failed
   error_code: string;
   error_message: string;
   original_payload: Record<string, unknown>;
   retry_count: number;
   status: DlqStatus;
-  failed_at: string;           // ISO; list sorted DESC
+  failed_at: string; // ISO; list sorted DESC
 }
 ```
 
@@ -117,7 +118,9 @@ List response envelope:
 
 ```ts
 // GET .../dlq?status=... → 200
-interface DlqListResponse { events: DlqEvent[]; }
+interface DlqListResponse {
+  events: DlqEvent[];
+}
 
 // POST .../dlq/{id}/retry   → { id: string; status: 'retried' }
 // POST .../dlq/{id}/discard → { id: string; status: 'discarded' }
@@ -126,7 +129,7 @@ interface DlqListResponse { events: DlqEvent[]; }
 Query-key factory (keyed by tenant + status filter):
 
 ```ts
-qk.dlq(tenantId).list(status)   // ['t', tenantId, 'dlq', 'list', status]
+qk.dlq(tenantId).list(status); // ['t', tenantId, 'dlq', 'list', status]
 ```
 
 Example read hook (hand-written; verify Orval coverage against `openapi.yaml`):
@@ -136,8 +139,9 @@ function useDlqEvents(tenantId: string, status: DlqStatus) {
   return useQuery({
     queryKey: qk.dlq(tenantId).list(status),
     queryFn: () =>
-      api.get<DlqListResponse>(tenantPath(tenantId, `/dlq?status=${status}`))
-        .then(r => r.data.events),
+      api
+        .get<DlqListResponse>(tenantPath(tenantId, `/dlq?status=${status}`))
+        .then((r) => r.data.events),
   });
 }
 ```
@@ -148,7 +152,7 @@ Mutations invalidate the DLQ list for the affected tenant so the row moves out o
 function useRetryDlq(tenantId: string) {
   return useMutation({
     mutationFn: (id: string) =>
-      api.post(tenantPath(tenantId, `/dlq/${id}/retry`)).then(r => r.data),
+      api.post(tenantPath(tenantId, `/dlq/${id}/retry`)).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['t', tenantId, 'dlq'] }),
   });
 }
@@ -168,6 +172,7 @@ function useRetryDlq(tenantId: string) {
 ## Actions & confirmations
 
 ### Retry
+
 - Button/menu item, gated by `<RequirePerm perm="dlq:retry">`.
 - On click → `POST .../dlq/{id}/retry`.
 - On success → **notistack** success toast and an **async-pipeline banner**:
@@ -178,6 +183,7 @@ function useRetryDlq(tenantId: string) {
 - Invalidate the DLQ list; the row's `status` becomes `retried`.
 
 ### Discard
+
 - Button/menu item, gated by `<RequirePerm perm="dlq:retry">` (same permission as retry).
 - Requires a **`ConfirmDialog`** (irreversible — no un-discard endpoint):
   > "Discard this dead-lettered event? This cannot be undone. The event will not be reprocessed."
@@ -190,8 +196,12 @@ display those entries yet — the audit log is write-only with no read endpoint.
 
 ```tsx
 <RequirePerm perm="dlq:retry">
-  <Button size="small" onClick={() => retry.mutate(row.id)}>Retry</Button>
-  <Button size="small" color="warning" onClick={() => setConfirmDiscard(row)}>Discard</Button>
+  <Button size="small" onClick={() => retry.mutate(row.id)}>
+    Retry
+  </Button>
+  <Button size="small" color="warning" onClick={() => setConfirmDiscard(row)}>
+    Discard
+  </Button>
 </RequirePerm>
 ```
 

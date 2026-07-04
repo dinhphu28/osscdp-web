@@ -50,10 +50,10 @@ Orval codegen reads the backend spec (`GET /openapi.yaml`, OpenAPI 3.0.3). Where
 
 Vite exposes these via `import.meta.env`. **No client secrets** — the admin token is entered at runtime, never baked into env.
 
-| Var | Purpose | Value |
-|---|---|---|
+| Var                 | Purpose                    | Value                                                                                                                      |
+| ------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `VITE_API_BASE_URL` | Base URL of the osscdp API | Dev default `http://localhost:8080`; docker `stack-up` maps it to `http://localhost:18080` (the OpenAPI spec's server URL) |
-| `VITE_APP_NAME` | Optional display name | e.g. `osscdp console` |
+| `VITE_APP_NAME`     | Optional display name      | e.g. `osscdp console`                                                                                                      |
 
 Example `.env`:
 
@@ -73,30 +73,30 @@ VITE_APP_NAME=osscdp console
 
 Read in order; the index and roadmap are the entry points. Screen specs under `docs/screens/` link up to sibling docs with `../`.
 
-| Doc | Purpose |
-|---|---|
-| [docs/00-index.md](docs/00-index.md) | **Start here.** Doc map + reading order for the agent. |
-| [docs/01-overview-and-domain.md](docs/01-product-overview.md) | The CDP domain, pipeline, and product scope. |
-| [docs/02-tech-stack.md](docs/02-tech-stack.md) | **Authoritative** pinned stack, versions, tooling config. |
-| [docs/03-auth-rbac-tenancy.md](docs/05-auth-rbac-tenancy.md) | Token auth, 6 roles, role→permission table, tenancy, PII masking. |
-| [docs/04-api-integration.md](docs/04-api-integration.md) | Axios/interceptors, TanStack Query, query-key factory, error envelope, pagination. |
-| [docs/05-app-architecture.md](docs/03-architecture.md) | Folder structure, routing, shared components, UI conventions. |
-| [docs/06-api-reference.md](docs/04-api-integration.md) | Exact admin endpoints, params, permissions, request/response shapes. |
-| [docs/07-data-model-and-types.md](docs/07-data-model-and-types.md) | Canonical TypeScript types and enums. |
-| [docs/08-testing.md](docs/08-testing-and-quality.md) | Vitest/RTL/MSW + Playwright conventions and golden path. |
-| [docs/09-build-roadmap.md](docs/09-build-roadmap.md) | **Phase-by-phase build plan.** Follow in order. |
-| [docs/10-backend-gaps-and-caveats.md](docs/10-backend-gaps-and-caveats.md) | Known backend gaps, TBDs, and workarounds. |
-| [docs/screens/01-connect.md](docs/screens/01-connect-and-shell.md) | Connect / token entry (`/connect`). |
-| [docs/screens/02-app-shell.md](docs/screens/01-connect-and-shell.md) | Nav rail, top bar, tenant switcher, theme toggle. |
-| [docs/screens/03-dashboard.md](docs/screens/02-dashboard.md) | Health, key metrics, DLQ count, activation rate. |
-| [docs/screens/04-sources.md](docs/screens/03-sources.md) | Sources list, create, rotate key, instrumentation help. |
-| [docs/screens/05-events.md](docs/screens/04-events-explorer.md) | Keyset-paginated events explorer + replay. |
-| [docs/screens/06-customer-360.md](docs/screens/05-customer-360.md) | Profile search, identity, events, segments, consent, GDPR. |
-| [docs/screens/07-segments.md](docs/screens/06-segments-and-rule-builder.md) | Segment list, rule builder, versions, members. |
-| [docs/screens/08-activation.md](docs/screens/07-activation-destinations.md) | Destinations, subscriptions, delivery log. |
-| [docs/screens/09-dlq.md](docs/screens/08-dlq-admin.md) | DLQ list/filter, retry, discard. |
-| [docs/screens/10-administration.md](docs/screens/09-administration.md) | Admin tokens, role matrix, tenants (super-admin). |
-| [docs/screens/11-audit.md](docs/screens/10-audit-log.md) | Audit log — **Phase 2, blocked on backend endpoint**. |
+| Doc                                                                         | Purpose                                                                            |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [docs/00-index.md](docs/00-index.md)                                        | **Start here.** Doc map + reading order for the agent.                             |
+| [docs/01-overview-and-domain.md](docs/01-product-overview.md)               | The CDP domain, pipeline, and product scope.                                       |
+| [docs/02-tech-stack.md](docs/02-tech-stack.md)                              | **Authoritative** pinned stack, versions, tooling config.                          |
+| [docs/03-auth-rbac-tenancy.md](docs/05-auth-rbac-tenancy.md)                | Token auth, 6 roles, role→permission table, tenancy, PII masking.                  |
+| [docs/04-api-integration.md](docs/04-api-integration.md)                    | Axios/interceptors, TanStack Query, query-key factory, error envelope, pagination. |
+| [docs/05-app-architecture.md](docs/03-architecture.md)                      | Folder structure, routing, shared components, UI conventions.                      |
+| [docs/06-api-reference.md](docs/04-api-integration.md)                      | Exact admin endpoints, params, permissions, request/response shapes.               |
+| [docs/07-data-model-and-types.md](docs/07-data-model-and-types.md)          | Canonical TypeScript types and enums.                                              |
+| [docs/08-testing.md](docs/08-testing-and-quality.md)                        | Vitest/RTL/MSW + Playwright conventions and golden path.                           |
+| [docs/09-build-roadmap.md](docs/09-build-roadmap.md)                        | **Phase-by-phase build plan.** Follow in order.                                    |
+| [docs/10-backend-gaps-and-caveats.md](docs/10-backend-gaps-and-caveats.md)  | Known backend gaps, TBDs, and workarounds.                                         |
+| [docs/screens/01-connect.md](docs/screens/01-connect-and-shell.md)          | Connect / token entry (`/connect`).                                                |
+| [docs/screens/02-app-shell.md](docs/screens/01-connect-and-shell.md)        | Nav rail, top bar, tenant switcher, theme toggle.                                  |
+| [docs/screens/03-dashboard.md](docs/screens/02-dashboard.md)                | Health, key metrics, DLQ count, activation rate.                                   |
+| [docs/screens/04-sources.md](docs/screens/03-sources.md)                    | Sources list, create, rotate key, instrumentation help.                            |
+| [docs/screens/05-events.md](docs/screens/04-events-explorer.md)             | Keyset-paginated events explorer + replay.                                         |
+| [docs/screens/06-customer-360.md](docs/screens/05-customer-360.md)          | Profile search, identity, events, segments, consent, GDPR.                         |
+| [docs/screens/07-segments.md](docs/screens/06-segments-and-rule-builder.md) | Segment list, rule builder, versions, members.                                     |
+| [docs/screens/08-activation.md](docs/screens/07-activation-destinations.md) | Destinations, subscriptions, delivery log.                                         |
+| [docs/screens/09-dlq.md](docs/screens/08-dlq-admin.md)                      | DLQ list/filter, retry, discard.                                                   |
+| [docs/screens/10-administration.md](docs/screens/09-administration.md)      | Admin tokens, role matrix, tenants (super-admin).                                  |
+| [docs/screens/11-audit.md](docs/screens/10-audit-log.md)                    | Audit log — **Phase 2, blocked on backend endpoint**.                              |
 
 > Some docs listed above may not exist yet — they are the intended structure. Where a fact is genuinely unknown, docs say "TBD — backend gap" and link [docs/10-backend-gaps-and-caveats.md](docs/10-backend-gaps-and-caveats.md) rather than guessing.
 

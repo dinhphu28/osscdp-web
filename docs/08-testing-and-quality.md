@@ -8,11 +8,11 @@ Related docs: [API integration](04-api-integration.md) · [Data model & types](0
 
 ## 1. Test pyramid & tooling
 
-| Layer | Tooling | What it covers | Volume |
-|---|---|---|---|
-| Unit | **Vitest** | Pure functions: Zod schemas, rule-builder → `Rule` JSON, permission math, masking/format helpers, query-key factory | Most tests |
-| Component / hook | **Vitest + React Testing Library (RTL) + MSW** | Forms, tables, dialogs, query/mutation hooks, RBAC gating, PII rendering — against a mocked admin API | Many |
-| E2E | **Playwright** | The golden path (§5) through a real browser against a running (or mocked) backend | Few, high-value |
+| Layer            | Tooling                                        | What it covers                                                                                                      | Volume          |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Unit             | **Vitest**                                     | Pure functions: Zod schemas, rule-builder → `Rule` JSON, permission math, masking/format helpers, query-key factory | Most tests      |
+| Component / hook | **Vitest + React Testing Library (RTL) + MSW** | Forms, tables, dialogs, query/mutation hooks, RBAC gating, PII rendering — against a mocked admin API               | Many            |
+| E2E              | **Playwright**                                 | The golden path (§5) through a real browser against a running (or mocked) backend                                   | Few, high-value |
 
 Pinned choices (from the canonical stack): Vitest, React Testing Library, MSW for component/hook tests; Playwright for e2e. Do not introduce Jest, Cypress, or other runners.
 
@@ -27,8 +27,8 @@ Run scripts (add to `package.json`):
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "build": "vite build"
-  }
+    "build": "vite build",
+  },
 }
 ```
 
@@ -36,8 +36,13 @@ Global test setup (`src/test/setup.ts`): install `@testing-library/jest-dom`, st
 
 ```tsx
 // src/test/renderWithProviders.tsx (illustrative)
-export function renderWithProviders(ui: ReactNode, { role = 'VIEWER', tenantId = TENANT, route = '/' } = {}) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+export function renderWithProviders(
+  ui: ReactNode,
+  { role = 'VIEWER', tenantId = TENANT, route = '/' } = {},
+) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider theme={theme}>
@@ -77,12 +82,12 @@ Handlers return e.g. `HttpResponse.json(apiError('forbidden', 'tenant scope viol
 
 Source key, admin token, and destination secret are returned in plaintext **exactly once** at create/rotate. Mock handlers return the secret field only on the create/rotate call; a subsequent GET of the entity MUST NOT include it.
 
-| Endpoint | One-time field | Prefix |
-|---|---|---|
-| `POST /admin/v1/tenants/{tenantID}/sources` | `api_key` (`SourceKeyOnce`) | `cdp_` |
-| `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `api_key` | `cdp_` |
-| `POST /admin/v1/admin-tokens` | `api_token` (`AdminTokenOnce`) | `cdpadm_` |
-| `POST /admin/v1/tenants/{tenantID}/destinations` | secret is accepted in the request but **never returned** | — |
+| Endpoint                                                          | One-time field                                           | Prefix    |
+| ----------------------------------------------------------------- | -------------------------------------------------------- | --------- |
+| `POST /admin/v1/tenants/{tenantID}/sources`                       | `api_key` (`SourceKeyOnce`)                              | `cdp_`    |
+| `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `api_key`                                                | `cdp_`    |
+| `POST /admin/v1/admin-tokens`                                     | `api_token` (`AdminTokenOnce`)                           | `cdpadm_` |
+| `POST /admin/v1/tenants/{tenantID}/destinations`                  | secret is accepted in the request but **never returned** | —         |
 
 Component test: creating a source shows `OneTimeSecretDialog` with the returned `api_key`, and the dialog copy warns the value cannot be retrieved again; closing requires explicit confirm.
 
@@ -106,10 +111,10 @@ All other list endpoints are **filter-only, no paging** (profiles by email/phone
 PII masking is server-side. Provide two profile fixtures keyed off whether the mocked token holds `pii:read`:
 
 | Trait | Masked (no `pii:read`) | Unmasked (`pii:read`) |
-|---|---|---|
-| email | `u***@x.com` | `user@example.com` |
-| phone | `+8490****567` | `+84901234567` |
-| name | `N***` | `Nguyen` |
+| ----- | ---------------------- | --------------------- |
+| email | `u***@x.com`           | `user@example.com`    |
+| phone | `+8490****567`         | `+84901234567`        |
+| name  | `N***`                 | `Nguyen`              |
 
 Tests: the console renders the value **as received** (never unmasks client-side); when a value looks masked and the role lacks `pii:read`, a lock-icon tooltip "unmask requires pii:read" is shown.
 
@@ -123,19 +128,19 @@ Tests: the console renders the value **as received** (never unmasks client-side)
 
 ## 3. What to unit-test per feature
 
-| Feature | Unit/component assertions |
-|---|---|
-| Connect / token entry | Zod validates token presence + optional base-URL override; a cheap validation call gates entry; token is stored; bad token → stays on `/connect` |
-| Auth / RBAC | `permissionsForRole(role)` matches the role→perm table exactly; `<RequirePerm>` hides/disables gated actions |
-| Sources | Create form validates via Zod; `OneTimeSecretDialog` shows `api_key`; rotate-key is behind a `ConfirmDialog` |
-| Events | `useInfiniteQuery` cursor paging; filters `identifier_key` (e.g. `user_id:u1`) + `event_name` build correct query params; payload `JsonViewer` renders |
-| Profiles / 360 | Search requires `email` OR `phone` (400 if neither); masked traits render as-is; identifiers show `by_namespace`/`total` |
-| Consent | Editor maps channel×purpose grid; `PUT consent` body `{channel, purpose, status, source?}`; absence renders as `unknown` |
-| GDPR | Export renders bundle; delete requires typing the `canonical_user_id` to confirm |
-| Segments / rule builder | **Rule builder emits correct `Rule` JSON** (see §3.1); Zod validates the tree; server `bad_request` maps to form errors |
-| Destinations | Webhook vs kafka `config` schema; one-time secret; subscription body `{trigger_type:"segment_membership", segment_id}` |
-| DLQ | Filter by `status=open|retried|discarded`; retry/discard behind confirm; payload viewer |
-| Query hooks | Mutations invalidate the right query keys (`qk.*(tenantId)...`); error interceptor maps codes |
+| Feature                 | Unit/component assertions                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Connect / token entry   | Zod validates token presence + optional base-URL override; a cheap validation call gates entry; token is stored; bad token → stays on `/connect`       |
+| Auth / RBAC             | `permissionsForRole(role)` matches the role→perm table exactly; `<RequirePerm>` hides/disables gated actions                                           |
+| Sources                 | Create form validates via Zod; `OneTimeSecretDialog` shows `api_key`; rotate-key is behind a `ConfirmDialog`                                           |
+| Events                  | `useInfiniteQuery` cursor paging; filters `identifier_key` (e.g. `user_id:u1`) + `event_name` build correct query params; payload `JsonViewer` renders |
+| Profiles / 360          | Search requires `email` OR `phone` (400 if neither); masked traits render as-is; identifiers show `by_namespace`/`total`                               |
+| Consent                 | Editor maps channel×purpose grid; `PUT consent` body `{channel, purpose, status, source?}`; absence renders as `unknown`                               |
+| GDPR                    | Export renders bundle; delete requires typing the `canonical_user_id` to confirm                                                                       |
+| Segments / rule builder | **Rule builder emits correct `Rule` JSON** (see §3.1); Zod validates the tree; server `bad_request` maps to form errors                                |
+| Destinations            | Webhook vs kafka `config` schema; one-time secret; subscription body `{trigger_type:"segment_membership", segment_id}`                                 |
+| DLQ                     | Filter by `status=open                                                                                                                                 | retried | discarded`; retry/discard behind confirm; payload viewer |
+| Query hooks             | Mutations invalidate the right query keys (`qk.*(tenantId)...`); error interceptor maps codes                                                          |
 
 ### 3.1 Rule-builder → `Rule` JSON
 
@@ -160,14 +165,14 @@ Cover: valid ops per `RuleOp`; `in`/`not_in` take arrays; `exists`/`not_exists` 
 
 Drive these from the canonical role→permission table. Parametrize component tests over roles.
 
-| Role | Write actions expected visible |
-|---|---|
-| `VIEWER` | **None** — all write/mutating actions hidden or disabled (read set only) |
-| `ANALYST` | None (read set only) |
-| `OPERATOR` | DLQ retry/discard (`dlq:retry`), event replay (`event:replay`); no segment/destination/admin writes |
-| `MARKETER` | Segment write (`segment:write`), destination write (`destination:write`), consent write (`consent:write`); **not** admin/tenant, **not** `profile:delete`, **not** `pii:read` |
-| `TENANT_ADMIN` | All writes within its tenant, incl. `admin:write`, `profile:delete`, `pii:read` |
-| `SUPER_ADMIN` | All, cross-tenant; tenant switcher shows all tenants; can create tenants (`POST /admin/v1/tenants`) |
+| Role           | Write actions expected visible                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VIEWER`       | **None** — all write/mutating actions hidden or disabled (read set only)                                                                                                      |
+| `ANALYST`      | None (read set only)                                                                                                                                                          |
+| `OPERATOR`     | DLQ retry/discard (`dlq:retry`), event replay (`event:replay`); no segment/destination/admin writes                                                                           |
+| `MARKETER`     | Segment write (`segment:write`), destination write (`destination:write`), consent write (`consent:write`); **not** admin/tenant, **not** `profile:delete`, **not** `pii:read` |
+| `TENANT_ADMIN` | All writes within its tenant, incl. `admin:write`, `profile:delete`, `pii:read`                                                                                               |
+| `SUPER_ADMIN`  | All, cross-tenant; tenant switcher shows all tenants; can create tenants (`POST /admin/v1/tenants`)                                                                           |
 
 Required RBAC assertions:
 
@@ -177,7 +182,7 @@ Required RBAC assertions:
 - UI gating is UX only — server also enforces (403). Include at least one test where a hidden action, if forced, still yields a mocked 403 handled gracefully.
 
 ```tsx
-it.each(['VIEWER','ANALYST'] as const)('%s hides Create Segment', (role) => {
+it.each(['VIEWER', 'ANALYST'] as const)('%s hides Create Segment', (role) => {
   renderWithProviders(<SegmentsPage />, { role, route: `/t/${TENANT}/segments` });
   expect(screen.queryByRole('button', { name: /create segment/i })).not.toBeInTheDocument();
 });
@@ -231,11 +236,11 @@ Also regenerate Orval types (`openapi.yaml`) and fail if the committed generated
 
 Coverage expectations (Vitest `--coverage`, thresholds enforced in CI):
 
-| Area | Line/branch floor |
-|---|---|
-| Pure logic (rule serializer, permission table, Zod schemas, masking/format helpers) | ~90% |
-| Feature components/hooks | ~80% |
-| Overall project | ~80% lines / ~75% branches |
+| Area                                                                                | Line/branch floor          |
+| ----------------------------------------------------------------------------------- | -------------------------- |
+| Pure logic (rule serializer, permission table, Zod schemas, masking/format helpers) | ~90%                       |
+| Feature components/hooks                                                            | ~80%                       |
+| Overall project                                                                     | ~80% lines / ~75% branches |
 
 Generated Orval output and pure type files may be excluded from coverage.
 

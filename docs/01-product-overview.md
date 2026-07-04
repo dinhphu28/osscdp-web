@@ -30,18 +30,18 @@ All of the above runs under:
 
 ### Domain entities (glossary)
 
-| Entity | What it is | Canonical type ([07](07-data-model-and-types.md)) |
-|---|---|---|
-| **Tenant** | An isolated customer org. Identified by a `{tenantID}` UUID; every admin route is scoped by it as a URL path segment. | `Tenant` |
-| **Source** | An instrumented app/channel that sends events; holds an ingress API key (`cdp_...`, shown once). | `Source`, `SourceKeyOnce` |
-| **Event** | A raw ingested record (`track`/`identify`/`alias`/`batch`) with a JSON payload; processed asynchronously. | `RawEvent` |
-| **Identity cluster** | The set of identifiers resolved to one person; yields the `canonical_user_id`. | `IdentityCluster`, `IdentityNode`, `MergeHistoryEntry` |
-| **Customer profile** | The unified per-person record: traits + computed attributes. | `CustomerProfile` |
-| **Segment** | A rule-based audience (versioned); members are profiles matching the rule. | `Segment`, `SegmentVersion`, `SegmentMembership`, `Rule` |
-| **Destination** | A downstream target (`webhook` / `kafka`) that receives activation. | `Destination`, `WebhookConfig`, `KafkaConfig` |
-| **Subscription** | A binding of a destination to a segment trigger (`segment_membership`). | `Subscription` |
-| **Consent** | Per-profile channel×purpose grant/deny state governing activation. | `ConsentRecord` |
-| **DLQ** | Dead-letter queue of failed pipeline events; can be retried or discarded. | `DlqEvent` |
+| Entity               | What it is                                                                                                            | Canonical type ([07](07-data-model-and-types.md))        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Tenant**           | An isolated customer org. Identified by a `{tenantID}` UUID; every admin route is scoped by it as a URL path segment. | `Tenant`                                                 |
+| **Source**           | An instrumented app/channel that sends events; holds an ingress API key (`cdp_...`, shown once).                      | `Source`, `SourceKeyOnce`                                |
+| **Event**            | A raw ingested record (`track`/`identify`/`alias`/`batch`) with a JSON payload; processed asynchronously.             | `RawEvent`                                               |
+| **Identity cluster** | The set of identifiers resolved to one person; yields the `canonical_user_id`.                                        | `IdentityCluster`, `IdentityNode`, `MergeHistoryEntry`   |
+| **Customer profile** | The unified per-person record: traits + computed attributes.                                                          | `CustomerProfile`                                        |
+| **Segment**          | A rule-based audience (versioned); members are profiles matching the rule.                                            | `Segment`, `SegmentVersion`, `SegmentMembership`, `Rule` |
+| **Destination**      | A downstream target (`webhook` / `kafka`) that receives activation.                                                   | `Destination`, `WebhookConfig`, `KafkaConfig`            |
+| **Subscription**     | A binding of a destination to a segment trigger (`segment_membership`).                                               | `Subscription`                                           |
+| **Consent**          | Per-profile channel×purpose grant/deny state governing activation.                                                    | `ConsentRecord`                                          |
+| **DLQ**              | Dead-letter queue of failed pipeline events; can be retried or discarded.                                             | `DlqEvent`                                               |
 
 Two secondary/governance entities also appear: **Admin token** (`AdminToken`, minted `cdpadm_...`), **Delivery log** (`DeliveryLog`), and **Audit log entry** (`AuditLogEntry` — write-only backend, see below).
 
@@ -63,20 +63,20 @@ Permission strings (copy exactly): `source:read`, `source:write`, `event:read`, 
 
 **Read set** = `source:read, event:read, profile:read, segment:read, destination:read, activation:read, audit:read, dlq:read`.
 
-| Persona | Role | Permissions |
-|---|---|---|
-| **Platform admin** | `SUPER_ADMIN` | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
-| **Tenant admin** | `TENANT_ADMIN` | ALL permissions, scoped to its own tenant |
-| **Marketer** | `MARKETER` | read set + `segment:write`, `destination:write`, `consent:write` |
-| **Analyst** | `ANALYST` | read set only |
-| **Operator** | `OPERATOR` | read set + `dlq:retry`, `event:replay` |
-| **Viewer** | `VIEWER` | read set only |
+| Persona            | Role           | Permissions                                                      |
+| ------------------ | -------------- | ---------------------------------------------------------------- |
+| **Platform admin** | `SUPER_ADMIN`  | ALL permissions; cross-tenant (tenant = nil, can switch tenants) |
+| **Tenant admin**   | `TENANT_ADMIN` | ALL permissions, scoped to its own tenant                        |
+| **Marketer**       | `MARKETER`     | read set + `segment:write`, `destination:write`, `consent:write` |
+| **Analyst**        | `ANALYST`      | read set only                                                    |
+| **Operator**       | `OPERATOR`     | read set + `dlq:retry`, `event:replay`                           |
+| **Viewer**         | `VIEWER`       | read set only                                                    |
 
 Notes: `pii:read`, `admin:write`, and `profile:delete` exist **only** in `SUPER_ADMIN` / `TENANT_ADMIN`. Note also that DLQ **discard** shares the `dlq:retry` permission (not a separate perm).
 
 ```ts
 export type AdminRole =
-  | 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'MARKETER' | 'ANALYST' | 'OPERATOR' | 'VIEWER';
+  'SUPER_ADMIN' | 'TENANT_ADMIN' | 'MARKETER' | 'ANALYST' | 'OPERATOR' | 'VIEWER';
 // The role→permission table lives client-side; gate actions with <RequirePerm perm="segment:write">.
 ```
 
