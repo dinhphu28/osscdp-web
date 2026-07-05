@@ -50,7 +50,7 @@ api.interceptors.request.use((config) => {
 
 - `401` = bad/missing token → clear token, redirect to `/connect`.
 - `403` = missing permission **or** tenant-scope violation → toast (do not log out).
-- There is **no admin `whoami`/principal endpoint** — the console cannot ask the API for the token's role. The operator declares their role at `/connect`, and the console gates the UI from the client-side role→permission table. See [Backend gaps & caveats](10-backend-gaps-and-caveats.md) gap #1.
+- `GET /admin/v1/whoami` returns the token's principal (`{role, tenant_id, is_super_admin}`), so the console auto-detects role after connect and gates the UI from the client-side role→permission table. The manual role picker at `/connect` is now only a **fallback** for older backends that `404` on `whoami`. See §4.2.
 
 ---
 
@@ -87,15 +87,16 @@ All paths below are relative to `VITE_API_BASE_URL`. All `/admin/v1/*` routes re
 | GET    | `/openapi.yaml` | Raw spec (Orval codegen source)                                                      |
 | GET    | `/docs`         | Redoc                                                                                |
 
-### 4.2 Tenants & Sources
+### 4.2 Principal, Tenants & Sources
 
-| Method | Path                                                         | Permission           | Purpose                                                                         |
-| ------ | ------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------- |
-| POST   | `/admin/v1/tenants`                                          | **SUPER_ADMIN only** | Create tenant; body `{name}` → `{id,name,status,created_at,updated_at}`         |
-| POST   | `/admin/v1/tenants/{tenantID}/sources`                       | `source:write`       | Create source; **returns ingest API key ONCE** (`SourceKeyOnce`, prefix `cdp_`) |
-| POST   | `/admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write`       | Rotate key (old key invalid immediately); returns new key once                  |
-
-> There is no confirmed "list tenants" / "list sources" endpoint in the spec extract for these — mark **TBD — backend gap**; see [Backend gaps & caveats](10-backend-gaps-and-caveats.md).
+| Method | Path                                                         | Permission           | Purpose                                                                                         |
+| ------ | ------------------------------------------------------------ | -------------------- | ----------------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/whoami`                                           | (any valid token)    | Principal for the current token → `{role, tenant_id, is_super_admin}`. Drives auto role-detect  |
+| GET    | `/admin/v1/tenants`                                          | **SUPER_ADMIN only** | **List tenants** (full array) → `[{id,name,status,created_at,updated_at}]`; powers the switcher  |
+| POST   | `/admin/v1/tenants`                                          | **SUPER_ADMIN only** | Create tenant; body `{name}` → `{id,name,status,created_at,updated_at}`                          |
+| GET    | `/admin/v1/tenants/{tenantID}/sources`                       | `source:read`        | **List sources** for the tenant (full array)                                                    |
+| POST   | `/admin/v1/tenants/{tenantID}/sources`                       | `source:write`       | Create source; **returns ingest API key ONCE** (`SourceKeyOnce`, prefix `cdp_`)                 |
+| POST   | `/admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write`       | Rotate key (old key invalid immediately); returns new key once                                  |
 
 ### 4.3 Admin tokens
 
@@ -148,12 +149,13 @@ Channels: `email, sms, push, ads, webhook`. Purposes: `marketing, analytics, per
 | GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}`              | `segment:read`     | Segment detail                                                                                                |
 | GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/members`      | `segment:read`     | Active members (no paging params — full array)                                                                |
 | GET    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/destinations` | `destination:read` | Destinations wired to this segment                                                                            |
-| GET    | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:read`     | **TBD — backend gap.** No "list all segments" endpoint confirmed in the spec extract; UI needs it. See gap #7 |
+| GET    | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:read`     | **List all segments** for the tenant (full array)                                                             |
 
 ### 4.9 Destinations / Activation
 
 | Method | Path                                                                                       | Permission          | Purpose                                                                                                             |
 | ------ | ------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/tenants/{tenantID}/destinations`                                                | `destination:read`  | **List destinations** for the tenant (full array)                                                                  |
 | POST   | `/admin/v1/tenants/{tenantID}/destinations`                                                | `destination:write` | Create; body `{type:"webhook"\|"kafka", name, secret?, channel?, purpose?, config}` → `201` (secret never returned) |
 | GET    | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}`                                | `destination:read`  | Destination detail                                                                                                  |
 | PUT    | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}`                                | `destination:write` | Update (e.g. disable)                                                                                               |
@@ -173,6 +175,20 @@ Webhook `config`: `{url, method?, headers?{}, timeout_ms?, max_retries?}` + top-
 
 > No DLQ export / mark-resolved endpoint — only list/retry/discard (gap #4).
 
+### 4.11 Audit log
+
+| Method | Path                                      | Permission   | Purpose                                                                                                                                                                                       |
+| ------ | ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/tenants/{tenantID}/audit`      | `audit:read` | **Keyset pagination** (same `limit`/`cursor` → `next_cursor` shape as events, §6.2/§8). **Metadata only**: each entry = `{created_at, actor_type, action, resource_type, resource_id}`        |
+
+> The audit read endpoint deliberately returns **metadata only** — there is **no `before`/`after` JSON diff** (omitted for PII reasons). Do not render a before/after diff column. See [Backend gaps & caveats](10-backend-gaps-and-caveats.md).
+
+### 4.12 Stats
+
+| Method | Path                                      | Permission        | Purpose                                                                                                                    |
+| ------ | ----------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/admin/v1/tenants/{tenantID}/stats`      | (read set)        | **JSON counts** for the dashboard → `{dlq_open, sources, segments, destinations, profiles}` (real numbers, no Prometheus) |
+
 ---
 
 ## 5. Orval codegen workflow
@@ -189,8 +205,6 @@ Generate TS types + TanStack Query hooks from the backend OpenAPI spec:
 | Gap                           | Reason                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `DELETE .../segments/{id}`    | In code, not in `openapi.yaml` (gap #5)                                                                            |
-| `GET .../segments` (list all) | Not confirmed in spec (gap #7) — **TBD — backend gap**                                                             |
-| List tenants / list sources   | Not confirmed in spec — **TBD — backend gap**                                                                      |
 | Any endpoint the spec omits   | Cross-check against §4 tables; hand-write and keep the shape from [Data model & types](07-data-model-and-types.md) |
 
 Hand-written types that supplement Orval output live in `src/types/` (§4 of the brief / [Data model & types](07-data-model-and-types.md)).
@@ -239,7 +253,7 @@ export const qk = {
 
 ### 6.2 Events use `useInfiniteQuery`
 
-Events are the **only** cursor-paginated resource. Everything else returns full arrays.
+Events and the audit log are the cursor-paginated resources (both use the same `limit`/`cursor` → `next_cursor` keyset shape); everything else returns full arrays. The `useInfiniteQuery` pattern below applies to audit too.
 
 ```ts
 // features/events/hooks/useEvents.ts
@@ -357,7 +371,7 @@ Two distinct patterns — do not mix them:
 
 | Pattern                     | Applies to                                                                                 | Mechanism                                                                                                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Keyset / cursor**         | `GET .../events` **only**                                                                  | `limit` (default 50, max 500) + opaque `cursor` → `next_cursor`. Data Grid in **server mode** with cursor state; `useInfiniteQuery` (§6.2). Empty `next_cursor` = last page. Never page numbers. |
+| **Keyset / cursor**         | `GET .../events` and `GET .../audit`                                                       | `limit` (default 50, max 500) + opaque `cursor` → `next_cursor`. Data Grid in **server mode** with cursor state; `useInfiniteQuery` (§6.2). Empty `next_cursor` = last page. Never page numbers. |
 | **Filter-only, full array** | profiles (email/phone), dlq (status), segment members, deliveries, consent, replay results | API returns the whole array. Render with the Data Grid in **client mode** (client-side paging/sorting/filtering).                                                                                |
 
 ---
