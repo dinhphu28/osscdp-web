@@ -12,9 +12,9 @@ Related docs: [API integration](04-api-integration.md) · [Data model & types](0
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------- |
 | Unit             | **Vitest**                                     | Pure functions: Zod schemas, rule-builder → `Rule` JSON, permission math, masking/format helpers, query-key factory | Most tests      |
 | Component / hook | **Vitest + React Testing Library (RTL) + MSW** | Forms, tables, dialogs, query/mutation hooks, RBAC gating, PII rendering — against a mocked admin API               | Many            |
-| E2E              | **Playwright**                                 | The golden path (§5) through a real browser against a running (or mocked) backend                                   | Few, high-value |
+| E2E              | **Playwright**                                 | The golden path + key flows (§5) through a real browser, with the admin API mocked via **in-browser route interception** (not MSW, no backend by default) | Few, high-value |
 
-Pinned choices (from the canonical stack): Vitest, React Testing Library, MSW for component/hook tests; Playwright for e2e. Do not introduce Jest, Cypress, or other runners.
+Pinned choices (from the canonical stack): Vitest, React Testing Library, MSW for **unit/component/hook tests**; Playwright with in-browser route interception for **e2e**. Do not introduce Jest, Cypress, or other runners. Note the split: MSW (a Service Worker) mocks the API for the jsdom unit/component layer; Playwright e2e mocks it with `page.route` in a real browser (§5) — MSW is **not** used for e2e.
 
 Run scripts (add to `package.json`):
 
@@ -190,22 +190,49 @@ it.each(['VIEWER', 'ANALYST'] as const)('%s hides Create Segment', (role) => {
 
 ---
 
-## 5. Golden-path Playwright e2e
+## 5. Playwright e2e (in-browser API mock)
 
-One end-to-end flow (brief §5). Prefer running against a real backend via docker `stack-up` (`VITE_API_BASE_URL=http://localhost:18080`, backend `CORS_ALLOWED_ORIGINS` set to the console origin, `AllowCredentials:false`); for CI without a backend, run Playwright with MSW/route interception using the same fixtures. Seed with a `SUPER_ADMIN` bootstrap token (backend `ADMIN_API_TOKEN`).
+E2E drives the **real UI** in a real browser (Chromium) while the cross-origin admin API is **mocked inside the browser** with Playwright's `page.route`. There is **no MSW and no running backend by default** — this keeps CI hermetic without standing up the Go + Postgres + Redpanda stack. All specs live in `e2e/` and share one harness.
 
-Steps:
+### 5.1 Shared harness — `e2e/support.ts`
 
-1. **Connect** — paste admin token (optional role declaration + base-URL override) at `/connect`; a cheap validation call succeeds; land on tenant picker.
-2. **Pick tenant** — select a tenant via the switcher → `/t/:tenantId/dashboard`.
-3. **Create source** — `POST .../sources`; `OneTimeSecretDialog` shows the `cdp_...` key; click copy; confirm-to-close; the key is gone afterward.
-4. **Lookup profile** — Customer 360 search by `email`/`phone` → profile detail; assert masked-vs-unmasked per token.
-5. **Create segment via rule builder** — build a nested rule; `POST .../segments` → `201`; verify the persisted `rule` matches the built tree.
-6. **Create webhook destination** — `POST .../destinations` `{type:"webhook", ..., config:{url,...}, secret}`; one-time secret handled.
-7. **Subscribe** — `POST .../destinations/{id}/subscriptions` `{trigger_type:"segment_membership", segment_id}`.
-8. **View deliveries** — `GET .../destinations/{id}/deliveries`; assert task statuses render (`pending, sending, succeeded, failed_retryable, failed_permanent, dlq, skipped`).
+- **`installMockApi(page, seed?)`** — installs a `page.route('${BASE_API}/**', …)` handler that mocks the admin API in-browser. It:
+  - handles **CORS**: every response carries `access-control-allow-*` headers and `OPTIONS` preflight is answered with `204`, because the app calls a **cross-origin** base URL (`http://localhost:8080`) from the dev server origin (`http://localhost:5173`);
+  - returns responses **shaped like the generated Orval models** (sources, tokens, tenants, profiles, consent, identifiers, export, segments, destinations, subscriptions, deliveries, DLQ, events), with a catch-all empty `200` so an unmodelled call never hangs the UI;
+  - **records every request** (`{ method, path, body }`) on the returned handle's `requests` array for assertions (e.g. that the create call carried the form values);
+  - accepts a **`seed`** whose fields (`profiles`, `profile`, `dlqEvents`, `events`, `segment`, `destination`, `healthFails`) can be set before navigation to drive specific states; the handle's `seed` can also be mutated later.
+- **`connect(page, { role?, tenantId? })`** — performs the token-entry flow: navigate to `/connect`, fill the admin token, optionally select a **role** (default `SUPER_ADMIN`) via the MUI Select so RBAC gating can be exercised, fill the tenant ID (default `TEST_TENANT`), submit, and assert landing on `/t/{tenantId}/dashboard`.
+- **Constants** — `TEST_TENANT` (`1111…`), `TEST_TOKEN` (`cdpadm_e2e_test_token`), `BASE_API` (`http://localhost:8080`).
 
-Because the pipeline is **asynchronous** (ingest returns `202`; identity→profile→segmentation→activation happen seconds later), e2e steps that depend on downstream results MUST poll/refresh with a bounded retry (Playwright `expect.poll` / `toPass`) rather than asserting instantly. The UI itself shows "processing — data may take a few seconds; refresh" with a manual refresh — assert that affordance exists.
+### 5.2 Specs present in `e2e/`
+
+| Spec                     | Covers                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `golden-path.spec.ts`    | Full flow: connect → dashboard (health chip) → create source (one-time key dialog) → profile lookup → create webhook destination.        |
+| `sources.spec.ts`        | Creating a source surfaces the one-time ingest API-key dialog; rotate-key (by ID) confirms then surfaces the new one-time key.           |
+| `customer360.spec.ts`    | Open a seeded profile; masked traits + computed attributes render; consent change (`PUT .../consent`); GDPR delete (typed confirm → `DELETE` → back to search). |
+| `segments.spec.ts`       | Segments → new-segment editor → drive the RuleBuilder (assert validation on the empty default leaf, then pick field + value) → create.   |
+| `dlq.spec.ts`            | DLQ triage: list dead-lettered events, inspect one in the detail Drawer, retry (republish) and discard (behind a `ConfirmDialog`).       |
+| `rbac-and-shell.spec.ts` | VIEWER read-only gating on nav/actions; app-shell controls (role chip, theme toggle, disconnect) for a SUPER_ADMIN.                       |
+
+### 5.3 Determinism choices
+
+- **Serial run** — `playwright.config.ts` sets `workers: 1` and `fullyParallel: false`; the specs share one dev server and mock the API per-page, so serial execution keeps timing deterministic (the suite is small and fast).
+- **Animations disabled** — `installMockApi` injects an `addInitScript` that sets `transition/animation: none` globally and hides `.MuiTooltip-popper`, so MUI menus/dialogs/selects open instantly and stably (avoids "element not stable / detached" flakes and tooltip overlays intercepting clicks).
+- CI reliability extras: `retries: 1` and `trace: 'on-first-retry'` on CI; `forbidOnly` on CI.
+
+### 5.4 How to run
+
+```bash
+pnpm exec playwright install chromium   # once, to fetch the browser
+pnpm test:e2e                            # runs playwright test
+```
+
+Playwright **auto-starts the dev server** via the `webServer` config (`command: 'pnpm dev'`, `url: http://localhost:5173`, `reuseExistingServer` off CI) — you do not start it manually.
+
+### 5.5 Escape hatch — running against a LIVE backend
+
+To exercise a real backend instead of the mock (per the `e2e/support.ts` header comment): point **`VITE_API_BASE_URL`** at the live API, **remove/skip the `installMockApi(page, …)` call**, and **seed real data** first (e.g. via a `SUPER_ADMIN` bootstrap token, backend `ADMIN_API_TOKEN`). Note the pipeline is **asynchronous** (ingest returns `202`; identity→profile→segmentation→activation happen seconds later), so any live-backend step that depends on downstream results must poll with a bounded retry (Playwright `expect.poll` / `toPass`) rather than asserting instantly, and the UI's "processing — refresh" affordance applies.
 
 ---
 
@@ -229,7 +256,7 @@ CI runs on every PR, in order; fail fast:
 3. typecheck # pnpm typecheck    (tsc --noEmit, strict)
 4. unit      # pnpm test:cov     (Vitest + coverage gate)
 5. build     # pnpm build        (vite build must succeed)
-6. e2e       # pnpm test:e2e     (Playwright; boots preview server / docker stack)
+6. e2e       # pnpm exec playwright install chromium && pnpm test:e2e   (auto-starts dev server via webServer, API mocked in-browser — no backend)
 ```
 
 Also regenerate Orval types (`openapi.yaml`) and fail if the committed generated client is stale.
