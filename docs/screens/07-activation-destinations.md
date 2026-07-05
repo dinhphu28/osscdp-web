@@ -51,22 +51,18 @@ with `Authorization: Bearer <adminToken>`.
 | `GET`    | `.../destinations/{destinationID}/deliveries`                     | `activation:read`   | Delivery attempts (filter-only, no paging → full array).                                     |
 | `GET`    | `.../segments/{segmentID}/destinations`                           | `destination:read`  | Destinations wired to a given segment (used from Segments screen).                           |
 
-> **TBD — backend gap:** there is **no confirmed "list all destinations" `GET .../destinations`
-> endpoint** in the spec extract. The list view needs it. Until confirmed, see
-> [Backend gaps & caveats](../10-backend-gaps-and-caveats.md). Fallback: track created destination
-> IDs client-side, or reach destinations only via a segment's `.../segments/{id}/destinations`. Do not
-> invent the list endpoint — flag it.
+> **List is live:** `GET .../destinations` returns all destinations for the tenant — the list view
+> renders a real table (open-by-ID / a segment's `.../segments/{id}/destinations` remain secondary
+> paths). See [Backend gaps & caveats](../10-backend-gaps-and-caveats.md) for what remains open.
 
 ## Layout & components
 
 ### Destinations list (`/t/:tenantId/destinations`)
 
 - **PageHeader**: title "Destinations", primary action **New destination** (gated `destination:write`).
-- **MUI X Data Grid** (client mode — filter-only, no server paging). Columns: `name`, `type`
-  (StatusChip), `status` (`active`/`disabled` StatusChip), `channel`, `purpose`, id (copyable),
-  row actions → View, Disable.
-- If the list endpoint is unavailable (see TBD above), render an **EmptyState/ErrorState** explaining
-  destinations are reachable via detail links / segments.
+- **MUI X Data Grid** (client mode — the `GET .../destinations` list is a full array, no server paging).
+  Columns: `name`, `type` (StatusChip), `status` (`active`/`disabled` StatusChip), `channel`, `purpose`,
+  id (copyable), row actions → View, Disable.
 
 ### Create destination form (dialog or `/destinations` inline panel)
 
@@ -111,8 +107,7 @@ Three regions (tabs or stacked panels):
 
 ## Subscriptions
 
-- **Add subscription**: pick a **segment** (needs the segment list — **TBD — backend gap**, no
-  confirmed `GET .../segments`; see [Backend gaps](../10-backend-gaps-and-caveats.md)). Body:
+- **Add subscription**: pick a **segment** from the segment list (`GET .../segments`, now live). Body:
   `{trigger_type: "segment_membership", segment_id}`.
 - `trigger_type` is fixed to `"segment_membership"` today. **Event-triggered activation is deferred** —
   render other trigger types disabled / omit them.
@@ -270,8 +265,6 @@ export interface DeliveryLog {
 - **Error:** ErrorState with retry; map the error envelope `{error:{code,message}}`. `403` → toast
   (missing `destination:write`/`activation:read` or tenant-scope). `429` → respect `Retry-After`.
   `400` (`bad_request`) on create → map to form fields / form-level alert.
-- **List-endpoint TBD:** if `GET .../destinations` is not available, show an informational state, not a
-  hard error (see gap above).
 
 ## Actions & confirmations
 
@@ -300,7 +293,7 @@ export interface DeliveryLog {
 
 ## Acceptance criteria (checklist)
 
-- [ ] Destinations list renders with type/status/channel/purpose columns; New destination gated by `destination:write`.
+- [ ] Destinations list renders as a real table from `GET .../destinations` with type/status/channel/purpose columns; New destination gated by `destination:write`.
 - [ ] Create form offers a type selector with `webhook` + `kafka` enabled and `push/email/crm/ads/warehouse` disabled ("coming soon").
 - [ ] Webhook form captures `config.url` (required), `method` (default `POST`), `headers` key/value editor, `timeout_ms` (5000), `max_retries` (5), and top-level `secret`.
 - [ ] Kafka form captures `config.topic` (required) and optional top-level `secret`.
@@ -312,7 +305,6 @@ export interface DeliveryLog {
 - [ ] Circuit-breaker indicator present (or shows "unavailable" per metrics gap).
 - [ ] Destination Enable/Disable via `PUT .../destinations/{id}` behind ConfirmDialog.
 - [ ] Webhook payload shape and signing headers (`X-CDP-Signature`, `Idempotency-Key`, `X-CDP-Tenant-Id`, `X-CDP-Event-Id`, `X-CDP-Destination-Id`) shown as receiver reference.
-- [ ] Missing "list all destinations" endpoint flagged as TBD linking [Backend gaps](../10-backend-gaps-and-caveats.md); no invented endpoint.
 - [ ] Loading/empty/error states present on list, subscriptions, and deliveries.
 
 ## See also

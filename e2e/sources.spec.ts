@@ -1,56 +1,59 @@
 import { test, expect } from '@playwright/test';
-import { installMockApi, connect } from './support';
+import { installMockApi, connect, TEST_TENANT } from './support';
 
 /**
- * Sources: creating a source surfaces the one-time ingest API key dialog, and
- * rotating a key (by ID) confirms then surfaces the new one-time key. Exercises
- * the real UI against the mocked admin API. See docs/screens/03-sources.md.
+ * Sources: the list table renders seeded sources; creating a source surfaces the
+ * one-time ingest API key dialog; rotating via the per-row action confirms then
+ * surfaces the new one-time key. Exercises the real UI against the mocked admin
+ * API. See docs/screens/03-sources.md.
  */
-test('sources: create shows one-time key dialog and rotate-key works', async ({ page }) => {
-  const mock = await installMockApi(page);
+test('sources: list, create one-time key, rotate via row action', async ({ page }) => {
+  const sourceId = '22222222-2222-2222-2222-222222222222';
+  const mock = await installMockApi(page, {
+    sources: [
+      {
+        id: sourceId,
+        tenant_id: TEST_TENANT,
+        name: 'web-tracker',
+        type: 'server',
+        status: 'active',
+        created_at: '2026-07-01T00:00:00Z',
+      },
+    ],
+  });
 
-  // Connect as SUPER_ADMIN (default) → dashboard.
-  await connect(page);
-
-  // Navigate to Sources.
+  await connect(page, mock);
   await page.getByRole('link', { name: 'Sources' }).click();
   await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
 
+  // The seeded source appears in the list table.
+  await expect(page.getByRole('gridcell', { name: 'web-tracker' })).toBeVisible();
+
   // --- Create: fill Name, leave Type as its "server" default, submit. ---
-  await page.getByLabel('Name').fill('web-tracker');
+  await page.getByRole('textbox', { name: 'Name' }).fill('mobile-sdk');
   await page.getByRole('button', { name: 'Create source' }).click();
 
-  // One-time secret dialog shows the mocked ingest key.
   const createDialog = page.getByRole('dialog');
   await expect(createDialog.getByText(/cdp_live_E2ETESTKEY/)).toBeVisible();
-  // Acknowledge (enables Done), then close.
   await createDialog.getByRole('checkbox').check();
   await createDialog.getByRole('button', { name: 'Done' }).click();
   await expect(createDialog).toBeHidden();
 
-  // The POST .../sources request carried the form values (Type defaulted to server).
   const created = mock.requests.find((r) => r.method === 'POST' && r.path.endsWith('/sources'));
-  expect(created?.body).toMatchObject({ name: 'web-tracker', type: 'server' });
+  expect(created?.body).toMatchObject({ name: 'mobile-sdk', type: 'server' });
 
-  // --- Rotate: enter a source ID, confirm, then see the new one-time key. ---
-  const sourceId = '22222222-2222-2222-2222-222222222222';
-  await page.getByLabel('Source ID (UUID)').fill(sourceId);
-  // Card button (there is also a "Rotate key" button inside the confirm dialog).
+  // --- Rotate: use the per-row "Rotate key" action → confirm → new one-time key. ---
   await page.getByRole('button', { name: 'Rotate key' }).click();
-
-  // ConfirmDialog — confirm via the "Rotate key" button scoped to the dialog.
   const confirmDialog = page.getByRole('dialog');
   await expect(confirmDialog.getByRole('heading', { name: 'Rotate API key?' })).toBeVisible();
   await confirmDialog.getByRole('button', { name: 'Rotate key' }).click();
 
-  // New one-time key dialog shows the rotated key; dismiss it.
   const rotateDialog = page.getByRole('dialog');
   await expect(rotateDialog.getByText(/cdp_live_ROTATED/)).toBeVisible();
   await rotateDialog.getByRole('checkbox').check();
   await rotateDialog.getByRole('button', { name: 'Done' }).click();
   await expect(rotateDialog).toBeHidden();
 
-  // The rotate-key request hit the right endpoint for the entered source ID.
   const rotated = mock.requests.find(
     (r) => r.method === 'POST' && r.path.endsWith(`/sources/${sourceId}/rotate-key`),
   );

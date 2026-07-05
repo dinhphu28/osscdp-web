@@ -20,17 +20,24 @@ import { useTenant } from '@/lib/tenant/TenantProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { useGetHealthz } from '@/lib/api/generated/ingress/ingress';
 import { useGetAdminV1TenantsTenantIDDlq } from '@/lib/api/generated/dlq/dlq';
+import { useGetAdminV1TenantsTenantIDStats } from '@/lib/api/generated/admin/admin';
 import { GetAdminV1TenantsTenantIDDlqStatus } from '@/lib/api/generated/model';
 
 /**
  * Dashboard — at-a-glance health and operability for the selected tenant.
  *
  * Honesty over vanity metrics: only numbers cheaply available from admin endpoints
- * are rendered (backend liveness, DLQ open count). Sources/Segments/Destinations
- * counts have no list endpoint (backend gap) and processing lag lives in Prometheus
- * text / Grafana — those are shown as "—" with a caption, never fabricated.
+ * are rendered (backend liveness, DLQ open count, and the per-tenant stats counts for
+ * Sources/Segments/Destinations/Profiles). A stat value of -1 means the backend reports
+ * the count as unavailable and is rendered as "—". Processing lag lives in Prometheus
+ * text / Grafana — that is still shown as "—" with a caption, never fabricated.
  * See docs/screens/02-dashboard.md and docs/10-backend-gaps-and-caveats.md.
  */
+
+/** A stat count of -1 (or missing) means "unavailable" — render as an em dash, never fabricate. */
+function formatStat(value: number | undefined): string {
+  return value === undefined || value === -1 ? '—' : String(value);
+}
 
 function MetricShell({
   label,
@@ -157,6 +164,39 @@ function DlqOpenCard({ tenantId, canRead }: { tenantId: string; canRead: boolean
   );
 }
 
+/**
+ * Sources / Segments / Destinations / Profiles counts from the per-tenant stats endpoint.
+ * Every read role has source:read (which the endpoint requires), so no extra gating is needed.
+ */
+function StatsCards({ tenantId }: { tenantId: string }) {
+  const stats = useGetAdminV1TenantsTenantIDStats(tenantId);
+
+  const cards: { label: string; value: number | undefined }[] = [
+    { label: 'Sources', value: stats.data?.sources },
+    { label: 'Segments', value: stats.data?.segments },
+    { label: 'Destinations', value: stats.data?.destinations },
+    { label: 'Profiles', value: stats.data?.profiles },
+  ];
+
+  return (
+    <>
+      {cards.map((card) => (
+        <MetricShell key={card.label} label={card.label} caption="GET .../stats">
+          {stats.isLoading ? (
+            <Skeleton variant="text" width={80} height={56} />
+          ) : stats.isError ? (
+            <ErrorState message="Couldn't load counts." onRetry={() => void stats.refetch()} />
+          ) : (
+            <Typography variant="h4" fontWeight={600}>
+              {formatStat(card.value)}
+            </Typography>
+          )}
+        </MetricShell>
+      ))}
+    </>
+  );
+}
+
 function QuickAction({
   label,
   to,
@@ -218,9 +258,7 @@ export function DashboardScreen() {
       >
         <HealthCard />
         <DlqOpenCard tenantId={tenantId} canRead={can('dlq:read')} />
-        <GapMetricCard label="Sources" caption="no list endpoint (backend gap)" />
-        <GapMetricCard label="Segments" caption="no list endpoint (backend gap)" />
-        <GapMetricCard label="Destinations" caption="no list endpoint (backend gap)" />
+        <StatsCards tenantId={tenantId} />
         <GapMetricCard label="Processing lag" caption="see Grafana / /metrics (Prometheus text)" />
       </Box>
 

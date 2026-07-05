@@ -30,7 +30,7 @@ The Tenants sub-section is a panel/tab within the Administration route, not a se
 | Role → Permission matrix        | `admin:write`       | Read-only reference; visible to anyone who can see the section |
 | Tenants sub-section             | `SUPER_ADMIN`       | Cross-tenant capability; `TENANT_ADMIN` must NOT see it        |
 
-`pii:read`, `admin:write`, and `profile:delete` are ONLY held by `SUPER_ADMIN` / `TENANT_ADMIN` (see [Auth & RBAC](../05-auth-rbac-tenancy.md) and the matrix below). Compute the current role's permissions from the client-side role→permission table — there is no admin `whoami` endpoint, so the operator's declared role is the source of truth for gating (see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)).
+`pii:read`, `admin:write`, and `profile:delete` are ONLY held by `SUPER_ADMIN` / `TENANT_ADMIN` (see [Auth & RBAC](../05-auth-rbac-tenancy.md) and the matrix below). Compute the current role's permissions from the client-side role→permission table; the role is resolved from `GET /admin/v1/whoami` at connect (manual pick only on a `whoami` 404 fallback).
 
 ## API calls used (exact paths)
 
@@ -38,9 +38,9 @@ The Tenants sub-section is a panel/tab within the Administration route, not a se
 | ------------------ | ----------------------------- | ------------------ | --------------------------- | ------------------------------------------------------------- |
 | Mint admin token   | `POST /admin/v1/admin-tokens` | `admin:write`      | `{ name, role, tenant_id }` | `{ api_token, role }` — plaintext `cdpadm_...` shown **ONCE** |
 | Create tenant      | `POST /admin/v1/tenants`      | `SUPER_ADMIN` only | `{ name }`                  | `{ id, name, status, created_at, updated_at }`                |
+| List tenants       | `GET /admin/v1/tenants`       | `SUPER_ADMIN`      | —                           | Real tenant list — renders the Tenants table                  |
 | List admin tokens  | TBD — no endpoint confirmed   | `admin:write`      | —                           | **TBD — backend gap**                                         |
 | Revoke admin token | TBD — no endpoint confirmed   | `admin:write`      | —                           | **TBD — backend gap**                                         |
-| List tenants       | TBD — no endpoint confirmed   | `SUPER_ADMIN`      | —                           | **TBD — backend gap**                                         |
 
 All admin requests send `Authorization: Bearer <adminToken>`. See [API integration](../04-api-integration.md) for the Axios interceptor and `tenantPath()` helper.
 
@@ -62,7 +62,7 @@ PageHeader "Administration"  (description: manage access control + tenant onboar
 ├── Section: Role → Permission matrix  (read-only reference component)
 └── Section: Tenants   ── ONLY rendered when role === 'SUPER_ADMIN'
       ├── [Create tenant] primary action
-      ├── Tenants table (Data Grid)  ── TBD: no list endpoint → blocked state (link docs/10)
+      ├── Tenants table (Data Grid)  ── real list from GET /admin/v1/tenants
       └── CreateTenantDialog → on success, offer "Mint TENANT_ADMIN token" hand-off step
 ```
 
@@ -169,8 +169,8 @@ Implement as a read-only component (e.g. a Data Grid or static table) driven by 
 
 | State            | Admin Tokens                                                                                                                                                                                                               | Tenants                                                                |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Loading          | Skeleton rows in the Data Grid (once a list endpoint exists)                                                                                                                                                               | Skeleton rows                                                          |
-| Empty            | **Blocked/TBD**: no list endpoint → show `EmptyState` "Listing tokens requires a backend `GET .../admin-tokens` endpoint" with a link to [Backend gaps & caveats](../10-backend-gaps-and-caveats.md). Minting still works. | **Blocked/TBD**: no list endpoint → same treatment for tenants         |
+| Loading          | Skeleton rows in the Data Grid (once a list endpoint exists)                                                                                                                                                               | Skeleton rows in the tenants Data Grid                                 |
+| Empty            | **Blocked/TBD**: no list endpoint → show `EmptyState` "Listing tokens requires a backend `GET .../admin-tokens` endpoint" with a link to [Backend gaps & caveats](../10-backend-gaps-and-caveats.md). Minting still works. | `EmptyState` "No tenants yet — create one to onboard" + Create tenant CTA |
 | Error            | `ErrorState` with retry; map `{error:{code,message}}` — `403` toast (permission/tenant scope), `401` → clear token + redirect `/connect`                                                                                   | Same                                                                   |
 | Mint success     | `OneTimeSecretDialog` opens with `api_token` (copy-once, "you cannot see this again")                                                                                                                                      | After create, show tenant summary + optional "mint TENANT_ADMIN token" |
 | Mint in-flight   | Disable submit, show spinner                                                                                                                                                                                               | Disable submit, show spinner                                           |
@@ -194,7 +194,7 @@ Implement as a read-only component (e.g. a Data Grid or static table) driven by 
 - Render the **Tenants** section only when `role === 'SUPER_ADMIN'`. A `TENANT_ADMIN` must not see tenant creation.
 - Enforce minting constraints in the form (role options + tenant field), but rely on the server `403` as the real boundary — UI gating is UX, not security.
 - **No PII** is displayed on this screen. The only sensitive values are the one-time token secrets, which follow the one-time-secret handling above (never stored/re-read).
-- There is no admin `whoami` endpoint, so the current operator's role is declared at connect time; gate everything from the client-side role→permission table (link [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)).
+- The current operator's role is resolved from `GET /admin/v1/whoami` at connect (manual pick only on a `whoami` 404 fallback); gate everything from the client-side role→permission table (see [Auth & RBAC](../05-auth-rbac-tenancy.md)).
 
 ## TBD — backend gaps
 
@@ -202,7 +202,8 @@ Flag these explicitly in the UI and cross-link [Backend gaps & caveats](../10-ba
 
 - **List admin tokens** — no `GET .../admin-tokens` endpoint confirmed. A `status` column exists server-side (`AdminToken.status: 'active'`), but the console cannot enumerate tokens today. Document the intended list UI (columns: name, role, tenant, status, created_at) as **TBD — backend gap**.
 - **Revoke admin token** — no revoke/disable endpoint confirmed. Document the intended revoke UI (row action + `ConfirmDialog`) as **TBD — backend gap**.
-- **List tenants** — no `GET /admin/v1/tenants` endpoint confirmed. This blocks both the Tenants table here and the tenant switcher in the app shell (cross-ref [Connect & app shell](01-connect-and-shell.md)). Document as **TBD — backend gap**.
+
+> **Resolved:** `GET /admin/v1/tenants` now exists — the Tenants table (and the app-shell tenant switcher, cross-ref [Connect & app shell](01-connect-and-shell.md)) render a real list.
 
 ## Acceptance criteria (checklist)
 
@@ -213,8 +214,8 @@ Flag these explicitly in the UI and cross-link [Backend gaps & caveats](../10-ba
 - [ ] For `TENANT_ADMIN`: role dropdown offers only non-super roles (no `SUPER_ADMIN`) and `tenant_id` is disabled/pinned to the current tenant.
 - [ ] On mint success, the plaintext `api_token` (prefix `cdpadm_`) is shown exactly once via `OneTimeSecretDialog` with a copy button and an unrecoverable-value warning; dialog requires confirm to close.
 - [ ] The role→permission matrix renders as a read-only reference driven by the same client-side role→perm map used for gating.
-- [ ] Tenants section is rendered only when `role === 'SUPER_ADMIN'`.
+- [ ] Tenants section is rendered only when `role === 'SUPER_ADMIN'` and renders a real list from `GET /admin/v1/tenants`.
 - [ ] "Create tenant" posts `POST /admin/v1/tenants` with `{ name }` and, on success, offers to mint a `TENANT_ADMIN` token with `tenant_id` prefilled to the new tenant's `id`.
-- [ ] Loading, empty (blocked/TBD), and error states are implemented for both tables; error handling maps the `{error:{code,message}}` envelope (`401` → `/connect`, `403` → toast).
-- [ ] Missing list/revoke token and list-tenants endpoints are surfaced as TBD blocked states linking [Backend gaps & caveats](../10-backend-gaps-and-caveats.md).
+- [ ] Loading, empty, and error states are implemented for both tables; error handling maps the `{error:{code,message}}` envelope (`401` → `/connect`, `403` → toast).
+- [ ] Missing admin-token **list/revoke** endpoints are surfaced as TBD blocked states linking [Backend gaps & caveats](../10-backend-gaps-and-caveats.md).
 - [ ] No token secret is logged, persisted, or re-readable from cache after the one-time dialog closes.

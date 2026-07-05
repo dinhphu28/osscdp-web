@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { enqueueSnackbar } from 'notistack';
@@ -25,13 +26,22 @@ import CheckIcon from '@mui/icons-material/CheckOutlined';
 import { PageHeader } from '@/components/PageHeader';
 import { OneTimeSecretDialog } from '@/components/OneTimeSecretDialog';
 import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { CopyButton } from '@/components/CopyButton';
+import { StatusChip } from '@/components/StatusChip';
+import { DataTable, type GridColDef } from '@/components/DataTable';
 import { useTenant } from '@/lib/tenant/TenantProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { ROLE_PERMISSIONS, ADMIN_ROLES } from '@/lib/auth/permissions';
+import { relativeTime } from '@/lib/format/datetime';
 import type { Permission } from '@/types';
 import { usePostAdminV1AdminTokens } from '@/lib/api/generated/admin-tokens/admin-tokens';
-import { usePostAdminV1Tenants } from '@/lib/api/generated/tenants-sources/tenants-sources';
+import {
+  usePostAdminV1Tenants,
+  useGetAdminV1Tenants,
+  getGetAdminV1TenantsQueryKey,
+} from '@/lib/api/generated/tenants-sources/tenants-sources';
+import type { Tenant } from '@/lib/api/generated/model';
 import { PostAdminV1AdminTokensBodyRole } from '@/lib/api/generated/model';
 
 const GAPS_DOC = 'docs/10-backend-gaps-and-caveats.md';
@@ -66,9 +76,9 @@ type SecretState = { label: string; value: string } | null;
  * Administration — access control (mint admin tokens, role/permission reference)
  * and super-admin tenant onboarding.
  *
- * NOTE (backend gaps): there is no list/revoke admin-tokens endpoint and no
- * list-tenants endpoint, so those surfaces are blocked/TBD states rather than
- * tables. Minting and tenant creation still work. See docs/10-backend-gaps-and-caveats.md.
+ * NOTE (backend gaps): there is no list/revoke admin-tokens endpoint, so that
+ * surface remains a blocked/TBD state. Minting still works. Tenants are now
+ * listable (super-admin only). See docs/10-backend-gaps-and-caveats.md.
  */
 export function AdministrationScreen() {
   const { can, isSuperAdmin } = useAuth();
@@ -352,8 +362,13 @@ function TenantsSection({
   setNewTenant: (t: { id: string; name: string } | null) => void;
   onMinted: (token: string) => void;
 }) {
+  const { isSuperAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const createMut = usePostAdminV1Tenants();
   const mintMut = usePostAdminV1AdminTokens();
+
+  // Gate the fetch so non-super users never trigger a 403.
+  const tenantsQuery = useGetAdminV1Tenants({ query: { enabled: isSuperAdmin } });
 
   const form = useForm<TenantForm>({
     resolver: zodResolver(tenantSchema),
@@ -366,12 +381,45 @@ function TenantsSection({
       if (res.id) {
         setNewTenant({ id: res.id, name: res.name ?? values.name.trim() });
       }
+      await queryClient.invalidateQueries({ queryKey: getGetAdminV1TenantsQueryKey() });
       enqueueSnackbar(`Tenant "${values.name}" created`, { variant: 'success' });
       form.reset({ name: '' });
     } catch {
       enqueueSnackbar('Failed to create tenant', { variant: 'error' });
     }
   };
+
+  const columns: GridColDef<Tenant>[] = [
+    { field: 'name', headerName: 'Name', flex: 1, minWidth: 160 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 140,
+      sortable: false,
+      renderCell: (params) => <StatusChip status={params.row.status ?? ''} />,
+    },
+    {
+      field: 'id',
+      headerName: 'ID',
+      flex: 1,
+      minWidth: 200,
+      sortable: false,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="body2" sx={{ fontFamily: 'monospace' }} noWrap>
+            {params.row.id}
+          </Typography>
+          <CopyButton value={params.row.id ?? ''} title="Copy tenant ID" />
+        </Stack>
+      ),
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 160,
+      renderCell: (params) => relativeTime(params.row.created_at),
+    },
+  ];
 
   const onMintTenantAdmin = async () => {
     if (!newTenant) return;
@@ -459,10 +507,24 @@ function TenantsSection({
             <Typography variant="subtitle1" gutterBottom>
               Existing tenants
             </Typography>
-            <EmptyState
-              title="Tenant listing unavailable"
-              description={`Listing tenants requires a backend GET /admin/v1/tenants endpoint that does not exist yet (TBD — backend gap). This also blocks the tenant switcher. See ${GAPS_DOC}.`}
-            />
+            {tenantsQuery.isError ? (
+              <ErrorState
+                message="Failed to load tenants."
+                onRetry={() => tenantsQuery.refetch()}
+              />
+            ) : !tenantsQuery.isLoading && (tenantsQuery.data?.tenants?.length ?? 0) === 0 ? (
+              <EmptyState
+                title="No tenants yet"
+                description="Create a tenant with the form to see it listed here."
+              />
+            ) : (
+              <DataTable<Tenant>
+                columns={columns}
+                rows={tenantsQuery.data?.tenants ?? []}
+                getRowId={(r) => r.id ?? ''}
+                loading={tenantsQuery.isLoading}
+              />
+            )}
           </CardContent>
         </Card>
       </Box>
