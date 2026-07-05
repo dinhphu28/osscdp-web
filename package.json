@@ -6,7 +6,7 @@
   "description": "Admin/operator console for the osscdp Customer Data Platform",
   "packageManager": "pnpm@11.9.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "vite",

@@ -80,7 +80,7 @@ Edges are hard dependencies. Segments depend on nothing but the shell to _create
 
 ### Deliverables
 
-- Vite v6+ + TypeScript **strict** project; pnpm; Node 20+.
+- Vite v6+ + TypeScript **strict** project; pnpm; Node 22.13+.
 - ESLint (typescript-eslint) + Prettier configured and passing.
 - Folder structure exactly per [Architecture & conventions](03-architecture.md):
   `src/app`, `src/lib/{api,auth,tenant,query,format}`, `src/features/*`, `src/components`, `src/types`.

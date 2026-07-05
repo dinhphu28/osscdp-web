@@ -9,7 +9,7 @@
 Read top-to-bottom. Each doc assumes you have read the ones above it.
 
 1. **[01-product-overview.md](01-product-overview.md)** — what a CDP is, what the console operates, the domain in one paragraph, and the cross-cutting facts (async pipeline, token-only auth, tenant scoping, PII masking, one-time secrets).
-2. **[02-tech-stack.md](02-tech-stack.md)** — the pinned, opinionated stack (Vite + TS strict, MUI v6+ / MUI X Data Grid v7+, React Router, TanStack Query v5, Axios, Orval, RHF + Zod, Vitest/RTL/MSW, Playwright, pnpm, Node 20+), env vars, and CORS constraints.
+2. **[02-tech-stack.md](02-tech-stack.md)** — the pinned, opinionated stack (Vite + TS strict, MUI v6+ / MUI X Data Grid v7+, React Router, TanStack Query v5, Axios, Orval, RHF + Zod, Vitest/RTL/MSW, Playwright, pnpm, Node 22.13+), env vars, and CORS constraints.
 3. **[03-architecture.md](03-architecture.md)** — folder structure (feature-based), providers, routing shape (`/t/:tenantId/<feature>`), query-key factory, UI conventions (PageHeader, OneTimeSecretDialog, ConfirmDialog, states, permission gating).
 4. **[04-api-integration.md](04-api-integration.md)** — Axios instance + interceptors, `tenantPath()` helper, error envelope handling, pagination conventions (keyset for events, filter-only elsewhere), Orval codegen from `openapi.yaml`.
 5. **[05-auth-rbac-tenancy.md](05-auth-rbac-tenancy.md)** — token-only auth (paste admin Bearer token, no login), the 6 roles and canonical role→permission table, tenant scoping by URL path, `<RequirePerm>` gating, PII masking rules.
