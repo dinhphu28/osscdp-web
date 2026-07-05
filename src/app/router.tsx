@@ -7,6 +7,18 @@ import { Placeholder } from '@/components/Placeholder';
 import { ConnectScreen } from '@/features/connect/ConnectScreen';
 import { SelectTenantScreen } from '@/features/connect/SelectTenantScreen';
 import { DashboardScreen } from '@/features/dashboard/DashboardScreen';
+import { SourcesScreen } from '@/features/sources/SourcesScreen';
+import { EventsScreen } from '@/features/events/EventsScreen';
+import { ProfilesScreen } from '@/features/profiles/ProfilesScreen';
+import { Customer360Screen } from '@/features/profiles/Customer360Screen';
+import { SegmentsScreen } from '@/features/segments/SegmentsScreen';
+import { SegmentEditorScreen } from '@/features/segments/SegmentEditorScreen';
+import { SegmentDetailScreen } from '@/features/segments/SegmentDetailScreen';
+import { DestinationsScreen } from '@/features/activation/DestinationsScreen';
+import { DestinationDetailScreen } from '@/features/activation/DestinationDetailScreen';
+import { DlqScreen } from '@/features/dlq/DlqScreen';
+import { AdministrationScreen } from '@/features/administration/AdministrationScreen';
+import { AuditScreen } from '@/features/audit/AuditScreen';
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth();
@@ -49,72 +61,18 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: 'dashboard', element: <DashboardScreen /> },
-      {
-        path: 'sources',
-        element: <Placeholder title="Sources" docPath="docs/screens/03-sources.md" />,
-      },
-      {
-        path: 'events',
-        element: (
-          <Placeholder title="Events Explorer" docPath="docs/screens/04-events-explorer.md" />
-        ),
-      },
-      {
-        path: 'profiles',
-        element: <Placeholder title="Profiles" docPath="docs/screens/05-customer-360.md" />,
-      },
-      {
-        path: 'profiles/:canonicalUserId',
-        element: <Placeholder title="Customer 360" docPath="docs/screens/05-customer-360.md" />,
-      },
-      {
-        path: 'segments',
-        element: (
-          <Placeholder title="Segments" docPath="docs/screens/06-segments-and-rule-builder.md" />
-        ),
-      },
-      {
-        path: 'segments/new',
-        element: (
-          <Placeholder title="New Segment" docPath="docs/screens/06-segments-and-rule-builder.md" />
-        ),
-      },
-      {
-        path: 'segments/:segmentId',
-        element: (
-          <Placeholder
-            title="Segment Detail"
-            docPath="docs/screens/06-segments-and-rule-builder.md"
-          />
-        ),
-      },
-      {
-        path: 'destinations',
-        element: (
-          <Placeholder title="Destinations" docPath="docs/screens/07-activation-destinations.md" />
-        ),
-      },
-      {
-        path: 'destinations/:destinationId',
-        element: (
-          <Placeholder
-            title="Destination Detail"
-            docPath="docs/screens/07-activation-destinations.md"
-          />
-        ),
-      },
-      {
-        path: 'dlq',
-        element: <Placeholder title="DLQ Admin" docPath="docs/screens/08-dlq-admin.md" />,
-      },
-      {
-        path: 'audit',
-        element: <Placeholder title="Audit Log" docPath="docs/screens/10-audit-log.md" />,
-      },
-      {
-        path: 'administration',
-        element: <Placeholder title="Administration" docPath="docs/screens/09-administration.md" />,
-      },
+      { path: 'sources', element: <SourcesScreen /> },
+      { path: 'events', element: <EventsScreen /> },
+      { path: 'profiles', element: <ProfilesScreen /> },
+      { path: 'profiles/:canonicalUserId', element: <Customer360Screen /> },
+      { path: 'segments', element: <SegmentsScreen /> },
+      { path: 'segments/new', element: <SegmentEditorScreen /> },
+      { path: 'segments/:segmentId', element: <SegmentDetailScreen /> },
+      { path: 'destinations', element: <DestinationsScreen /> },
+      { path: 'destinations/:destinationId', element: <DestinationDetailScreen /> },
+      { path: 'dlq', element: <DlqScreen /> },
+      { path: 'audit', element: <AuditScreen /> },
+      { path: 'administration', element: <AdministrationScreen /> },
       {
         path: '*',
         element: <Placeholder title="Not found" docPath="docs/screens/00-screen-map.md" />,
