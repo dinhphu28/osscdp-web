@@ -1,0 +1,19 @@
+node_modules
+dist
+.git
+.github
+e2e
+test-results
+playwright-report
+coverage
+*.log
+
+# Local env / secrets (VITE_API_BASE_URL is passed as a build ARG instead).
+.env
+.env.*
+!.env.example
+
+# Docs and editor config aren't needed in the image build context.
+docs
+.vscode
+.remember
