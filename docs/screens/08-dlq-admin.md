@@ -190,9 +190,9 @@ function useRetryDlq(tenantId: string) {
 - On confirm → `POST .../dlq/{id}/discard`.
 - On success → success toast; invalidate the DLQ list; the row's `status` becomes `discarded`.
 
-Both actions are **audited server-side** (the backend writes an audit entry). The console cannot
-display those entries yet — the audit log is write-only with no read endpoint. See
-[backend gaps §2](../10-backend-gaps-and-caveats.md).
+Both actions are **audited server-side** (the backend writes an audit entry). These entries are now
+readable in the Audit screen via `GET .../audit` (metadata-only — actor/action/resource/time, no
+before/after JSON). See [backend gaps §2](../10-backend-gaps-and-caveats.md).
 
 ```tsx
 <RequirePerm perm="dlq:retry">

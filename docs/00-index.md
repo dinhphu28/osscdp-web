@@ -18,7 +18,7 @@ Read top-to-bottom. Each doc assumes you have read the ones above it.
 8. **Screen specs** — read **[screens/screen-map.md](screens/00-screen-map.md) first** (route → screen index), then the individual screen docs under `docs/screens/` for the surface you are building (connect, shell, dashboard, sources, events, customer 360, segments, activation, dlq, administration, audit).
 9. **[08-testing.md](08-testing-and-quality.md)** — Vitest + RTL + MSW conventions, Playwright golden path, RBAC/PII test requirements, a11y.
 10. **[09-build-roadmap.md](09-build-roadmap.md)** — **the execution order.** Follow this doc's phasing when implementing; it sequences scaffolding → auth/shell → per-feature delivery.
-11. **[10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md)** — **what cannot be built yet** and where the API is missing/inconsistent. Consult before building any screen; several features (e.g. audit read, segment "list all") are blocked or need hand-written client code.
+11. **[10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md)** — **what cannot be built yet** and where the API is missing/inconsistent. Consult before building any screen; some features (e.g. admin-token list/revoke, source-disable, `DELETE .../segments/{id}`) are still blocked or need hand-written client code.
 
 ## Document map
 
@@ -41,7 +41,7 @@ Read top-to-bottom. Each doc assumes you have read the ones above it.
 
 Docs 01–07 are **foundational reference**: they define the domain, stack, architecture, API integration, security model, design system, and shared types. Every screen spec under `docs/screens/` builds on that foundation and is intentionally thin — it names the exact routes, permissions, API paths, types (from [07-data-model-and-types.md](07-data-model-and-types.md)), states, and acceptance criteria for one surface, and cross-links back to the foundational docs (screen files link up with `../`, e.g. [API integration](04-api-integration.md)). [08-testing.md](08-testing-and-quality.md) applies across all features.
 
-Two docs govern **what and when**: [09-build-roadmap.md](09-build-roadmap.md) is the **execution order** — implement features in the sequence it prescribes, not in document-number order. [10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md) lists everything that **cannot be built yet** or where the backend API is missing/inconsistent (no admin `whoami`, write-only audit log with no read route, no segment "list all", `DELETE .../segments/{id}` absent from `openapi.yaml`, etc.). Whenever a screen spec says "TBD — backend gap", it links there. Check both before starting a screen: the roadmap tells you if it's in scope now, the gaps doc tells you if it's even possible.
+Two docs govern **what and when**: [09-build-roadmap.md](09-build-roadmap.md) is the **execution order** — implement features in the sequence it prescribes, not in document-number order. [10-backend-gaps-and-caveats.md](10-backend-gaps-and-caveats.md) lists everything that **cannot be built yet** or where the backend API is missing/inconsistent (no admin-token list/revoke, no source-disable, no rate-limit config API, audit read is metadata-only with no before/after diff, `DELETE .../segments/{id}` absent from `openapi.yaml`, etc.). Whenever a screen spec says "TBD — backend gap", it links there. Check both before starting a screen: the roadmap tells you if it's in scope now, the gaps doc tells you if it's even possible.
 
 ### Non-negotiable conventions to carry into every doc
 
