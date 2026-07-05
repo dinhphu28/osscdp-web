@@ -30,7 +30,7 @@ Use the **latest stable major** of each library. The major shown is the **floor*
 | Local/UI state       | React context + hooks; **Zustand** only if needed               | Token/tenant context; reach for Zustand only when context becomes unwieldy.                                              |
 | Notifications        | **notistack** (or MUI Snackbar)                                 | Success/error toasts.                                                                                                    |
 | Package manager      | **pnpm** (preferred)                                            | Fast, disk-efficient, strict dependency resolution.                                                                      |
-| Node                 | **Node 20+**                                                    | Baseline runtime for Vite 6 and the tooling above.                                                                       |
+| Node                 | **Node 22.13+**                                                 | Baseline runtime; required by the pinned pnpm 11.9.0 (uses `node:sqlite`).                                                |
 
 ---
 
@@ -108,7 +108,7 @@ VITE_APP_NAME=osscdp console
 
 ## 5. Node / pnpm versions & editor setup
 
-- **Node 20+** (LTS). Pin via `.nvmrc` (`20`) and/or `package.json` `"engines": { "node": ">=20" }`.
+- **Node 22.13+** (LTS "Jod"). Required because the pinned pnpm 11.9.0 uses `node:sqlite` (available from Node 22.13). Pin via `.nvmrc` (`22`) and `package.json` `"engines": { "node": ">=22.13" }`.
 - **pnpm** is the required package manager. Pin via `"packageManager": "pnpm@<version>"` and enable `corepack enable` so contributors use the same pnpm.
 - Recommended `.vscode/extensions.json`:
 

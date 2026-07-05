@@ -25,7 +25,7 @@ These shape nearly every screen — internalize them before writing any code:
 
 ## Chosen stack (summary)
 
-**MUI Material v6+ / MUI X Data Grid v7+ / MUI X Date Pickers · Vite v6+ (TypeScript strict) · React Router v6.4+ data APIs · TanStack Query v5 · Axios · React Hook Form v7 + Zod v3 · Orval (types + hooks from `openapi.yaml`) · Recharts · Vitest + React Testing Library + MSW · Playwright · ESLint + Prettier · pnpm · Node 20+.**
+**MUI Material v6+ / MUI X Data Grid v7+ / MUI X Date Pickers · Vite v6+ (TypeScript strict) · React Router v6.4+ data APIs · TanStack Query v5 · Axios · React Hook Form v7 + Zod v3 · Orval (types + hooks from `openapi.yaml`) · Recharts · Vitest + React Testing Library + MSW · Playwright · ESLint + Prettier · pnpm · Node 22.13+.**
 
 Full rationale and version floors live in [docs/02-tech-stack.md](docs/02-tech-stack.md).
 
