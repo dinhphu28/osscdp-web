@@ -67,6 +67,28 @@ VITE_APP_NAME=osscdp console
 - **Backend repo:** `/home/dinhphu28/ghq/github.com/dinhphu28/osscdp` (Go, API-only). This console consumes its **admin API** (`/admin/v1/*`); the ingress API (`/v1/*`) is only referenced as instrumentation help text.
 - **CORS is mandatory.** Backend CORS is driven by env `CORS_ALLOWED_ORIGINS` (empty = blocks all cross-origin). The backend deployment **MUST** set `CORS_ALLOWED_ORIGINS` to include the console's origin, or every request fails. `AllowCredentials: false`, so the token travels in the `Authorization` header (never a cookie). Allowed headers include `Authorization, Content-Type, Accept, X-Api-Key`.
 
+## Deployment
+
+The console is a static SPA. A multi-stage [`Dockerfile`](Dockerfile) builds it and serves the output
+with nginx ([`nginx.conf`](nginx.conf) — gzip, hashed-asset caching, and the client-side-routing
+fallback to `index.html`).
+
+```bash
+# Build (bake the backend URL; you can also override it at runtime on /connect).
+docker build --build-arg VITE_API_BASE_URL=https://api.your-host.example -t osscdp-web .
+
+# Run (serve on any port).
+docker run --rm -p 8080:80 osscdp-web        # → http://localhost:8080
+```
+
+- **Set the backend's CORS to the console's deployed origin** (see *Backend & CORS* above) — e.g.
+  `CORS_ALLOWED_ORIGINS=…,https://console.your-host.example`. This is the #1 deployment gotcha.
+- **Runtime backend override:** `VITE_API_BASE_URL` is baked at build time, but operators can point
+  the same image at a different backend by editing the **API base URL** field on the `/connect`
+  screen — no rebuild needed.
+- **No-Docker alternative:** `pnpm build` produces `dist/`; serve it on any static host (S3/CDN,
+  Netlify, etc.) with a rewrite of all unknown paths to `/index.html` for client-side routing.
+
 ---
 
 ## Documentation map
