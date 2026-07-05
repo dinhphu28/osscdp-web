@@ -42,6 +42,17 @@ export interface MockSeed {
   segment?: Record<string, unknown>;
   /** Destination returned by GET .../destinations/{id}. */
   destination?: Record<string, unknown>;
+  /** List endpoints (browsable console). */
+  sources?: Array<Record<string, unknown>>;
+  segments?: Array<Record<string, unknown>>;
+  destinations?: Array<Record<string, unknown>>;
+  tenants?: Array<Record<string, unknown>>;
+  /** Audit entries returned by GET .../audit. */
+  auditEntries?: Array<Record<string, unknown>>;
+  /** Stats object returned by GET .../stats. */
+  stats?: Record<string, number>;
+  /** Principal returned by GET /admin/v1/whoami (set by `connect`). */
+  whoami?: { role: string; tenant_id: string | null; is_super_admin: boolean };
   /** Force GET .../dlq to fail (to exercise error states). */
   healthFails?: boolean;
 }
@@ -91,6 +102,37 @@ export async function installMockApi(page: Page, seed: MockSeed = {}): Promise<M
 
     // ---- health ----
     if (path.endsWith('/healthz')) return json(route, 200, { status: 'ok' });
+
+    // ---- whoami + read lists (browsable console); anchored to avoid collisions ----
+    if (method === 'GET' && path.endsWith('/admin/v1/whoami')) {
+      return json(
+        route,
+        200,
+        api.seed.whoami ?? { role: 'SUPER_ADMIN', tenant_id: null, is_super_admin: true },
+      );
+    }
+    if (method === 'GET' && path.endsWith('/admin/v1/tenants')) {
+      return json(route, 200, { tenants: api.seed.tenants ?? [] });
+    }
+    if (method === 'GET' && /\/tenants\/[^/]+\/sources$/.test(path)) {
+      return json(route, 200, { sources: api.seed.sources ?? [] });
+    }
+    if (method === 'GET' && /\/tenants\/[^/]+\/segments$/.test(path)) {
+      return json(route, 200, { segments: api.seed.segments ?? [] });
+    }
+    if (method === 'GET' && /\/tenants\/[^/]+\/destinations$/.test(path)) {
+      return json(route, 200, { destinations: api.seed.destinations ?? [] });
+    }
+    if (method === 'GET' && /\/tenants\/[^/]+\/audit$/.test(path)) {
+      return json(route, 200, { entries: api.seed.auditEntries ?? [], next_cursor: '' });
+    }
+    if (method === 'GET' && /\/tenants\/[^/]+\/stats$/.test(path)) {
+      return json(
+        route,
+        200,
+        api.seed.stats ?? { dlq_open: 0, sources: 0, segments: 0, destinations: 0, profiles: 0 },
+      );
+    }
 
     // ---- sources ----
     if (method === 'POST' && /\/sources$/.test(path)) {
@@ -188,7 +230,10 @@ export async function installMockApi(page: Page, seed: MockSeed = {}): Promise<M
           name: 'E2E segment',
           status: 'active',
           current_version_id: 'segver-1',
-          rule: { operator: 'and', conditions: [{ field: 'profile.traits.country', op: 'eq', value: 'US' }] },
+          rule: {
+            operator: 'and',
+            conditions: [{ field: 'profile.traits.country', op: 'eq', value: 'US' }],
+          },
         },
       );
     }
@@ -307,35 +352,42 @@ function defaultEvent(): Record<string, unknown> {
 
 /** Role type for the connect helper. */
 export type ConnectRole =
-  | 'SUPER_ADMIN'
-  | 'TENANT_ADMIN'
-  | 'MARKETER'
-  | 'ANALYST'
-  | 'OPERATOR'
-  | 'VIEWER';
+  'SUPER_ADMIN' | 'TENANT_ADMIN' | 'MARKETER' | 'ANALYST' | 'OPERATOR' | 'VIEWER';
 
 /**
  * Perform the token-entry connect flow and land on the tenant dashboard.
- * Selects the given role (default SUPER_ADMIN) so RBAC gating can be exercised.
+ *
+ * The role is now resolved from GET /admin/v1/whoami (no dropdown). This helper
+ * seeds `mock.seed.whoami` from `opts.role`: a pinned (non-super) role reports a
+ * `tenant_id` and lands directly on the dashboard; SUPER_ADMIN reports null and
+ * is routed via /select-tenant, where we pick the tenant. Pass the `MockApi`
+ * handle returned by `installMockApi`.
  */
 export async function connect(
   page: Page,
+  mock: MockApi,
   opts: { role?: ConnectRole; tenantId?: string } = {},
 ): Promise<void> {
   const role = opts.role ?? 'SUPER_ADMIN';
   const tenantId = opts.tenantId ?? TEST_TENANT;
+  const pinned = role !== 'SUPER_ADMIN';
+
+  mock.seed.whoami = {
+    role,
+    tenant_id: pinned ? tenantId : null,
+    is_super_admin: role === 'SUPER_ADMIN',
+  };
 
   await page.goto('/connect');
   await page.getByLabel('Admin token').fill(TEST_TOKEN);
-
-  if (role !== 'SUPER_ADMIN') {
-    // MUI Select renders a combobox; the role select is the only one on this page.
-    await page.getByRole('combobox').click();
-    await page.getByRole('option', { name: role, exact: true }).click();
-  }
-
-  await page.getByLabel('Tenant ID (optional)').fill(tenantId);
   await page.getByRole('button', { name: 'Connect' }).click();
+
+  // Super-admin → /select-tenant (pick a tenant); pinned → straight to dashboard.
+  await page.waitForURL(/\/(select-tenant|t\/[^/]+\/dashboard)/);
+  if (page.url().includes('/select-tenant')) {
+    await page.getByLabel('Tenant ID (UUID)').fill(tenantId);
+    await page.getByRole('button', { name: 'Open tenant' }).click();
+  }
 
   await expect(page).toHaveURL(new RegExp(`/t/${tenantId}/dashboard`));
 }

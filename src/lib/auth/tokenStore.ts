@@ -12,6 +12,7 @@ import type { AdminRole } from '@/types';
 const TOKEN_KEY = 'osscdp.token';
 const ROLE_KEY = 'osscdp.role';
 const BASE_URL_KEY = 'osscdp.baseUrl';
+const TENANT_KEY = 'osscdp.tenantId';
 
 export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -19,6 +20,8 @@ export interface AuthSnapshot {
   token: string | null;
   role: AdminRole | null;
   baseUrl: string;
+  /** The principal's pinned tenant (from whoami); null for cross-tenant super-admins. */
+  tenantId: string | null;
 }
 
 function read(): AuthSnapshot {
@@ -27,6 +30,7 @@ function read(): AuthSnapshot {
     token: store?.getItem(TOKEN_KEY) ?? null,
     role: (store?.getItem(ROLE_KEY) as AdminRole | null) ?? null,
     baseUrl: store?.getItem(BASE_URL_KEY) ?? DEFAULT_BASE_URL,
+    tenantId: store?.getItem(TENANT_KEY) ?? null,
   };
 }
 
@@ -41,28 +45,33 @@ export const tokenStore = {
   getToken: () => snapshot.token,
   getRole: () => snapshot.role,
   getBaseUrl: () => snapshot.baseUrl,
+  getTenantId: () => snapshot.tenantId,
   get: (): AuthSnapshot => snapshot,
 
-  set(next: { token: string; role: AdminRole | null; baseUrl?: string }) {
+  set(next: { token: string; role: AdminRole | null; baseUrl?: string; tenantId?: string | null }) {
     snapshot = {
       token: next.token,
       role: next.role,
       baseUrl: next.baseUrl ?? snapshot.baseUrl,
+      tenantId: next.tenantId !== undefined ? next.tenantId : snapshot.tenantId,
     };
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(TOKEN_KEY, snapshot.token ?? '');
       if (snapshot.role) sessionStorage.setItem(ROLE_KEY, snapshot.role);
       else sessionStorage.removeItem(ROLE_KEY);
       sessionStorage.setItem(BASE_URL_KEY, snapshot.baseUrl);
+      if (snapshot.tenantId) sessionStorage.setItem(TENANT_KEY, snapshot.tenantId);
+      else sessionStorage.removeItem(TENANT_KEY);
     }
     emit();
   },
 
   clear() {
-    snapshot = { token: null, role: null, baseUrl: snapshot.baseUrl };
+    snapshot = { token: null, role: null, baseUrl: snapshot.baseUrl, tenantId: null };
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(ROLE_KEY);
+      sessionStorage.removeItem(TENANT_KEY);
     }
     emit();
   },

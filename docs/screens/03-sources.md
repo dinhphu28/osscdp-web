@@ -36,12 +36,12 @@ All admin routes require `Authorization: Bearer <adminToken>` and are tenant-sco
 
 | Purpose        | Method & path                                                     | Permission     | Notes                                                                                                                                                                                |
 | -------------- | ----------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| List sources   | `GET /admin/v1/tenants/{tenantID}/sources`                        | `source:read`  | Real list table (full array, client-mode paging)                                                                                                                                     |
 | Create source  | `POST /admin/v1/tenants/{tenantID}/sources`                       | `source:write` | **Returns ingest API key ONCE** (`{ api_key }`, prefix `cdp_`)                                                                                                                       |
-| Rotate key     | `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write` | Returns new key once; **old key invalid immediately**                                                                                                                                |
-| List sources   | **TBD — backend gap**                                             | `source:read`  | A `GET /admin/v1/tenants/{tenantID}/sources` is NOT confirmed in the spec. UI needs it to render the table. See [Backend gaps](../10-backend-gaps-and-caveats.md)                    |
-| Disable source | **TBD — backend gap**                                             | `source:write` | Likely `PUT /admin/v1/tenants/{tenantID}/sources/{sourceID}` (set `status: "disabled"`) but not confirmed in the spec extract. See [Backend gaps](../10-backend-gaps-and-caveats.md) |
+| Rotate key     | `POST /admin/v1/tenants/{tenantID}/sources/{sourceID}/rotate-key` | `source:write` | Per-row action; returns new key once; **old key invalid immediately**                                                                                                                |
+| Disable source | **TBD — backend gap**                                             | `source:write` | No confirmed disable route (likely `PUT /admin/v1/tenants/{tenantID}/sources/{sourceID}` set `status: "disabled"`). See [Backend gaps](../10-backend-gaps-and-caveats.md)             |
 
-> The **list** and **disable** endpoints are unconfirmed. Wire the create/rotate flows against the confirmed endpoints now; stub the list/disable calls behind a thin data-hook so the screen degrades gracefully (empty state / disabled action) until the backend endpoints land.
+> **List is live** — the table renders from `GET .../sources`; open-by-ID stays as a secondary path. Only the **disable** endpoint is still pending: stub it behind a thin data-hook so the action degrades gracefully (disabled with a tooltip) until the backend adds it.
 
 ### Ingress endpoints (shown as help text only — the console does NOT call these)
 
@@ -196,7 +196,6 @@ curl -X POST "$CDP_BASE_URL/v1/events/track" \
 | Loading               | Data Grid skeleton rows                                                                                                                                                            |
 | Empty                 | `EmptyState` — "No sources yet. Create one to start ingesting events." + primary "Create source" (gated)                                                                           |
 | Error                 | `ErrorState` with retry; parse `{error:{code,message}}` envelope                                                                                                                   |
-| List endpoint missing | If `GET .../sources` is unavailable (TBD backend gap), render an informational `EmptyState` explaining the list endpoint is pending backend support; still allow **Create source** |
 | One-time key shown    | OneTimeSecretDialog blocks until the operator confirms they copied the value                                                                                                       |
 
 ## RBAC & PII notes
@@ -207,14 +206,14 @@ curl -X POST "$CDP_BASE_URL/v1/events/track" \
 
 ## Acceptance criteria (checklist)
 
-- [ ] Route `/t/:tenantId/sources` renders a PageHeader with a "Create source" primary action gated by `source:write`.
-- [ ] Sources table shows columns: name, type, status (StatusChip `active`/`disabled`), created_at (relative), rate_limit, actions.
+- [ ] Route `/t/:tenantId/sources` renders a real list table from `GET .../sources` plus a "Create source" primary action gated by `source:write`.
+- [ ] Sources table shows columns: name, type, status (StatusChip `active`/`disabled`), created_at (relative), rate_limit, actions (per-row **Rotate key**).
 - [ ] Create form (RHF + Zod) validates `name` and `type` required; `allowed_event_types` and `rate_limit` optional; submit disabled while pending.
 - [ ] `POST .../sources` success opens OneTimeSecretDialog showing the `cdp_...` api_key with a copy button and a "cannot be retrieved again" warning; requires confirm to close.
 - [ ] Rotate action shows a ConfirmDialog warning the old key stops working immediately, then calls `POST .../sources/{sourceID}/rotate-key` and shows the new key in OneTimeSecretDialog.
 - [ ] After create/rotate the sources list query is invalidated/refetched.
 - [ ] Disable action calls `PUT .../sources/{sourceID}` when available; otherwise renders disabled with a tooltip and is marked TBD — backend gap.
-- [ ] List endpoint is treated as TBD — backend gap; the screen degrades gracefully (create still works) when `GET .../sources` is unavailable.
+- [ ] The list renders from `GET .../sources`; open-by-ID remains a secondary path.
 - [ ] Mutating actions are hidden/disabled for roles lacking `source:write` (verified with a VIEWER token).
 - [ ] Instrumentation help panel documents ingress endpoints, the `X-CDP-Api-Key` header, the async `202` behavior, and the `X-Api-Key` CORS-mismatch caveat with a link to backend gaps.
 - [ ] Server `bad_request` validation errors are surfaced on the form.

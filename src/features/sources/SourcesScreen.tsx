@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { enqueueSnackbar } from 'notistack';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Accordion,
   AccordionDetails,
@@ -21,10 +22,21 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { PageHeader } from '@/components/PageHeader';
 import { OneTimeSecretDialog } from '@/components/OneTimeSecretDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { StatusChip } from '@/components/StatusChip';
+import { CopyButton } from '@/components/CopyButton';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
+import { DataTable, type GridColDef } from '@/components/DataTable';
+import { relativeTime } from '@/lib/format/datetime';
 import { useTenant } from '@/lib/tenant/TenantProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { usePostAdminV1TenantsTenantIDSources } from '@/lib/api/generated/tenants-sources/tenants-sources';
-import { usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey } from '@/lib/api/generated/tenants-sources/tenants-sources';
+import {
+  useGetAdminV1TenantsTenantIDSources,
+  getGetAdminV1TenantsTenantIDSourcesQueryKey,
+  usePostAdminV1TenantsTenantIDSources,
+  usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey,
+} from '@/lib/api/generated/tenants-sources/tenants-sources';
+import type { Source } from '@/lib/api/generated/model/source';
 
 const createSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -33,22 +45,27 @@ const createSchema = z.object({
 type CreateForm = z.infer<typeof createSchema>;
 
 /**
- * Sources — provision data sources (ingest API keys) and rotate them.
- * NOTE (backend gap): there is no list-sources endpoint, so this screen provides
- * create + rotate-by-ID rather than a table. See docs/screens/03-sources.md and
- * docs/10-backend-gaps-and-caveats.md.
+ * Sources — list, provision (ingest API keys) and rotate data sources.
+ * See docs/screens/03-sources.md.
  */
 export function SourcesScreen() {
   const { tenantId } = useTenant();
   const { can } = useAuth();
   const canWrite = can('source:write');
+  const queryClient = useQueryClient();
 
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
   const [rotateId, setRotateId] = useState('');
   const [rotateConfirmOpen, setRotateConfirmOpen] = useState(false);
 
+  const q = useGetAdminV1TenantsTenantIDSources(tenantId);
   const createMut = usePostAdminV1TenantsTenantIDSources();
   const rotateMut = usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey();
+
+  const invalidateSources = () =>
+    queryClient.invalidateQueries({
+      queryKey: getGetAdminV1TenantsTenantIDSourcesQueryKey(tenantId),
+    });
 
   const form = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -63,6 +80,7 @@ export function SourcesScreen() {
       }
       enqueueSnackbar(`Source "${values.name}" created`, { variant: 'success' });
       form.reset({ name: '', type: 'server' });
+      await invalidateSources();
     } catch {
       enqueueSnackbar('Failed to create source', { variant: 'error' });
     }
@@ -77,10 +95,57 @@ export function SourcesScreen() {
       }
       enqueueSnackbar('Key rotated — the previous key is now invalid', { variant: 'success' });
       setRotateId('');
+      await invalidateSources();
     } catch {
       enqueueSnackbar('Failed to rotate key', { variant: 'error' });
     }
   };
+
+  const columns: GridColDef<Source>[] = [
+    { field: 'name', headerName: 'Name', flex: 1, minWidth: 160 },
+    { field: 'type', headerName: 'Type', width: 120 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      renderCell: (params) => <StatusChip status={String(params.row.status ?? 'unknown')} />,
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 150,
+      renderCell: (params) => <span>{relativeTime(params.row.created_at)}</span>,
+    },
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 170,
+      sortable: false,
+      renderCell: (params) => <CopyButton value={String(params.row.id ?? '')} title="Copy ID" />,
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 140,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="outlined"
+          color="warning"
+          disabled={!canWrite || rotateMut.isPending}
+          onClick={() => {
+            setRotateId(String(params.row.id ?? ''));
+            setRotateConfirmOpen(true);
+          }}
+        >
+          Rotate key
+        </Button>
+      ),
+    },
+  ];
+
+  const rows = q.data?.sources ?? [];
 
   return (
     <>
@@ -96,11 +161,23 @@ export function SourcesScreen() {
         </Alert>
       )}
 
-      <Alert severity="warning" sx={{ mb: 3 }}>
-        The backend has no list-sources endpoint yet, so existing sources can't be shown here. Use
-        the source ID captured at creation to rotate a key. (See
-        docs/10-backend-gaps-and-caveats.md.)
-      </Alert>
+      <Box sx={{ mb: 3 }}>
+        {q.isError ? (
+          <ErrorState message="Failed to load sources." onRetry={() => q.refetch()} />
+        ) : !q.isLoading && rows.length === 0 ? (
+          <EmptyState
+            title="No sources yet"
+            description="Create a source below to start ingesting events."
+          />
+        ) : (
+          <DataTable
+            rows={rows}
+            columns={columns}
+            getRowId={(r) => r.id ?? ''}
+            loading={q.isLoading}
+          />
+        )}
+      </Box>
 
       <Box
         sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, mb: 3 }}
@@ -145,26 +222,10 @@ export function SourcesScreen() {
             <Typography variant="h6" gutterBottom>
               Rotate API key
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Rotating immediately invalidates the current key. The replacement is shown once.
+            <Typography variant="body2" color="text.secondary">
+              Use the <strong>Rotate key</strong> action on a source row above. Rotating immediately
+              invalidates the current key, and the replacement is shown once.
             </Typography>
-            <Stack spacing={2}>
-              <TextField
-                label="Source ID (UUID)"
-                value={rotateId}
-                onChange={(e) => setRotateId(e.target.value)}
-                disabled={!canWrite}
-              />
-              <Button
-                variant="outlined"
-                color="warning"
-                disabled={!canWrite || !rotateId.trim() || rotateMut.isPending}
-                onClick={() => setRotateConfirmOpen(true)}
-                sx={{ alignSelf: 'flex-start' }}
-              >
-                Rotate key
-              </Button>
-            </Stack>
           </CardContent>
         </Card>
       </Box>

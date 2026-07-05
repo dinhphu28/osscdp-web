@@ -12,8 +12,8 @@ import { installMockApi, connect } from './support';
  */
 
 test('VIEWER: read-only gating on nav and source actions', async ({ page }) => {
-  await installMockApi(page);
-  await connect(page, { role: 'VIEWER' });
+  const mock = await installMockApi(page);
+  await connect(page, mock, { role: 'VIEWER' });
 
   // Dashboard shows the role chip for the connected VIEWER.
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
@@ -24,9 +24,9 @@ test('VIEWER: read-only gating on nav and source actions', async ({ page }) => {
 
   // Sources is read-only for VIEWER (has source:read, lacks source:write).
   await page.getByRole('link', { name: 'Sources' }).click();
-  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sources', exact: true })).toBeVisible();
 
-  // The read-only info Alert appears (distinct from the always-present backend-gap warning).
+  // The read-only info Alert appears.
   await expect(page.getByText(/read-only for sources/)).toBeVisible();
 
   // The create action is gated off.
@@ -34,8 +34,8 @@ test('VIEWER: read-only gating on nav and source actions', async ({ page }) => {
 });
 
 test('shell: role chip, theme toggle, disconnect (SUPER_ADMIN)', async ({ page }) => {
-  await installMockApi(page);
-  await connect(page); // SUPER_ADMIN
+  const mock = await installMockApi(page);
+  await connect(page, mock); // SUPER_ADMIN
 
   // Role chip + admin-only nav are present for a SUPER_ADMIN.
   await expect(page.getByText('SUPER_ADMIN', { exact: true })).toBeVisible();

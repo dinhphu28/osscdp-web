@@ -15,7 +15,8 @@ import { SelectTenantScreen } from '@/features/connect/SelectTenantScreen';
  * chrome stays mounted while a child chunk loads (Suspense lives around the
  * Outlet). See docs/03-architecture.md §7.
  */
-const named = <T extends string>(name: T) =>
+const named =
+  <T extends string>(name: T) =>
   <M extends Record<T, React.ComponentType>>(m: M) => ({ default: m[name] });
 
 const DashboardScreen = lazy(() =>
@@ -24,7 +25,9 @@ const DashboardScreen = lazy(() =>
 const SourcesScreen = lazy(() =>
   import('@/features/sources/SourcesScreen').then(named('SourcesScreen')),
 );
-const EventsScreen = lazy(() => import('@/features/events/EventsScreen').then(named('EventsScreen')));
+const EventsScreen = lazy(() =>
+  import('@/features/events/EventsScreen').then(named('EventsScreen')),
+);
 const ProfilesScreen = lazy(() =>
   import('@/features/profiles/ProfilesScreen').then(named('ProfilesScreen')),
 );

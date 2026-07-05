@@ -31,7 +31,8 @@ There is **NO user login, NO username/password, NO session, NO JWT, NO users tab
 `lib/auth/` holds the token store and provider.
 
 - **Storage:** in-memory by default; **optionally** mirrored to `sessionStorage` so a page refresh survives (see [Security notes](#7-security-notes)). Never `localStorage` for the token.
-- `AuthProvider` exposes `useAuth()` → `{ token, role, connect(token, role, baseUrlOverride?), disconnect() }`.
+- `AuthProvider` exposes `useAuth()` → `{ token, role, connect(token, baseUrlOverride?), disconnect() }`.
+- On connect the provider calls `GET /admin/v1/whoami` to resolve the role + pinned tenant (see §2). An optional `role` override is accepted only as the `whoami`-404 fallback.
 - The Axios request interceptor reads the token from this store and sets the `Authorization` header (see [API integration](04-api-integration.md)).
 - The Axios response interceptor calls `disconnect()` on `401` and redirects to `/connect`.
 
@@ -39,25 +40,27 @@ There is **NO user login, NO username/password, NO session, NO JWT, NO users tab
 // lib/auth/AuthProvider.tsx (illustrative)
 interface AuthState {
   token: string | null;
-  role: AdminRole; // declared at /connect (see §3)
-  connect: (token: string, role: AdminRole, baseUrl?: string) => void;
+  role: AdminRole; // resolved from GET /admin/v1/whoami (see §2); manual pick only on 404 fallback
+  connect: (token: string, baseUrl?: string, roleFallback?: AdminRole) => void;
   disconnect: () => void; // clears token (memory + sessionStorage) → navigate('/connect')
 }
 ```
 
 ---
 
-## 2. The NO-whoami gap (declared role)
+## 2. Role & tenant from `whoami` (fallback to a manual picker)
 
-**There is NO admin `whoami`/principal endpoint.** The console cannot ask the API for the current token's role or permissions. (Ingress has `GET /v1/auth/whoami`, but that is for source keys, not the admin console.)
+**The console resolves the role from `GET /admin/v1/whoami`** at connect. The response is
+`{ role, tenant_id, is_super_admin }`: `role` seeds RBAC gating, `tenant_id` pins the tenant for
+non-super tokens, and `is_super_admin` drives cross-tenant behavior (the tenant switcher / SelectTenant).
 
-Consequences and the required approach:
+Required approach:
 
-- The operator **selects/declares their role** on the `/connect` screen when pasting the token.
-- The console holds the **canonical role→permission table** (below) client-side and computes the current permission set from the declared role.
-- **Least-privilege default:** if the role is unknown/unselected, treat the token as the lowest privilege (`VIEWER` read-set) and let the server reveal capability via `403`s. Never assume elevated permissions.
+- On connect, call `whoami` and store the returned `role` + `tenant_id`. The console holds the **canonical role→permission table** (below) client-side and computes the current permission set from that role.
+- **Fallback (404 only):** if the backend lacks the endpoint and returns `404` (older build), fall back to a **manual role picker** on `/connect`. Default an unknown/unselected role to least-privilege (`VIEWER` read-set) and let the server reveal capability via `403`s.
+- Do **not** confuse this with the ingress `GET /v1/auth/whoami`, which is for source keys — never call it from the console.
 
-**Trade-off:** the declared role is unverified — a user could declare `SUPER_ADMIN` while holding a `VIEWER` token. This only affects **UI affordances**; the server still enforces every permission and returns `403` on real attempts. Client-side gating is UX, not security. Tracked in [Backend gaps & caveats](10-backend-gaps-and-caveats.md) (gap #1).
+**Trade-off (fallback path only):** a manually-declared role is unverified — a user could pick `SUPER_ADMIN` while holding a `VIEWER` token. This only affects **UI affordances**; the server still enforces every permission and returns `403` on real attempts. Client-side gating is UX, not security.
 
 ---
 
@@ -202,7 +205,7 @@ export function useTenant() {
 | `SUPER_ADMIN` (tenant nil) | Cross-tenant → show a switcher listing all tenants                   |
 | All other roles            | Pinned to one tenant → switcher shows only that tenant, or is hidden |
 
-**Super-admin tenant list:** there is **no confirmed "list tenants" (`GET /admin/v1/tenants`) endpoint** in the spec extract — only `POST /admin/v1/tenants` (create). Mark as **TBD — backend gap** (see [Backend gaps & caveats](10-backend-gaps-and-caveats.md)). Until confirmed, the super-admin switcher must support **manual tenant-ID entry** (paste a UUID) in addition to any list it can populate.
+**Super-admin tenant list:** `GET /admin/v1/tenants` (super-admin) now returns a real tenant list, so SelectTenant and the switcher render an actual picker. Manual tenant-ID entry (paste a UUID) is kept as a **secondary/fallback** path.
 
 ### 403 tenant-scope violation
 

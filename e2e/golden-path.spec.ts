@@ -31,14 +31,14 @@ test('golden path: connect, source, profile lookup, destination', async ({ page 
   });
 
   // 1. Connect → Dashboard
-  await connect(page);
+  await connect(page, mock);
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByText('OK', { exact: true })).toBeVisible(); // health chip loaded
 
   // 2. Sources → create → one-time key dialog
   await page.getByRole('link', { name: 'Sources' }).click();
-  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
-  await page.getByLabel('Name').fill('web-tracker');
+  await expect(page.getByRole('heading', { name: 'Sources', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Name' }).fill('web-tracker');
   await page.getByRole('button', { name: 'Create source' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -61,9 +61,9 @@ test('golden path: connect, source, profile lookup, destination', async ({ page 
 
   // 4. Destinations → create webhook → lands on detail
   await page.getByRole('link', { name: 'Destinations' }).click();
-  await expect(page.getByRole('heading', { name: 'Destinations' })).toBeVisible();
-  await page.getByLabel('Name').fill('crm-webhook');
-  await page.getByLabel('URL').fill('https://example.test/hook');
+  await expect(page.getByRole('heading', { name: 'Destinations', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Name' }).fill('crm-webhook');
+  await page.getByRole('textbox', { name: 'URL' }).fill('https://example.test/hook');
   await page.getByRole('button', { name: 'Create destination' }).click();
   await expect(page).toHaveURL(new RegExp(`/t/${TEST_TENANT}/destinations/dst-e2e-1`));
 });
