@@ -11,20 +11,32 @@ background.
  * OpenAPI spec version: 1.0.0
  */
 import {
-  useMutation
+  useMutation,
+  useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
-  UseMutationResult
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   BadRequestResponse,
   ForbiddenResponse,
+  GetAdminV1AdminTokens200,
+  NotFoundResponse,
   PostAdminV1AdminTokens201,
-  PostAdminV1AdminTokensBody
+  PostAdminV1AdminTokensBody,
+  PostAdminV1AdminTokensTokenIDRevoke200
 } from '.././model';
 
 import { apiClient } from '../../axios';
@@ -32,6 +44,101 @@ import type { ErrorType , BodyType } from '../../axios';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+/**
+ * Requires `admin:write`. SUPER_ADMIN sees every tenant's tokens; a
+TENANT_ADMIN sees only its own tenant's. The token hash is never returned.
+
+ * @summary List admin tokens
+ */
+export const getAdminV1AdminTokens = (
+    
+ options?: SecondParameter<typeof apiClient>,signal?: AbortSignal
+) => {
+      
+      
+      return apiClient<GetAdminV1AdminTokens200>(
+      {url: `/admin/v1/admin-tokens`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetAdminV1AdminTokensQueryKey = () => {
+    return [
+    `/admin/v1/admin-tokens`
+    ] as const;
+    }
+
+    
+export const getGetAdminV1AdminTokensQueryOptions = <TData = Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminV1AdminTokensQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminV1AdminTokens>>> = ({ signal }) => getAdminV1AdminTokens(requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminV1AdminTokensQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminV1AdminTokens>>>
+export type GetAdminV1AdminTokensQueryError = ErrorType<ForbiddenResponse>
+
+
+export function useGetAdminV1AdminTokens<TData = Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError = ErrorType<ForbiddenResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminV1AdminTokens>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminV1AdminTokens>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminV1AdminTokens<TData = Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminV1AdminTokens>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminV1AdminTokens>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminV1AdminTokens<TData = Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List admin tokens
+ */
+
+export function useGetAdminV1AdminTokens<TData = Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1AdminTokens>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminV1AdminTokensQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
 
 
 
@@ -99,6 +206,72 @@ export const usePostAdminV1AdminTokens = <TError = ErrorType<BadRequestResponse 
       > => {
 
       const mutationOptions = getPostAdminV1AdminTokensMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Requires `admin:write`. SUPER_ADMIN may revoke any token; a TENANT_ADMIN
+may revoke only its own tenant's tokens (403 otherwise). Revoking takes
+effect immediately since auth resolves only active tokens.
+
+ * @summary Revoke an admin token (invalidated immediately)
+ */
+export const postAdminV1AdminTokensTokenIDRevoke = (
+    tokenID: string,
+ options?: SecondParameter<typeof apiClient>,signal?: AbortSignal
+) => {
+      
+      
+      return apiClient<PostAdminV1AdminTokensTokenIDRevoke200>(
+      {url: `/admin/v1/admin-tokens/${tokenID}/revoke`, method: 'POST', signal
+    },
+      options);
+    }
+  
+
+
+export const getPostAdminV1AdminTokensTokenIDRevokeMutationOptions = <TError = ErrorType<ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>, TError,{tokenID: string}, TContext>, request?: SecondParameter<typeof apiClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>, TError,{tokenID: string}, TContext> => {
+
+const mutationKey = ['postAdminV1AdminTokensTokenIDRevoke'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>, {tokenID: string}> = (props) => {
+          const {tokenID} = props ?? {};
+
+          return  postAdminV1AdminTokensTokenIDRevoke(tokenID,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminV1AdminTokensTokenIDRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>>
+    
+    export type PostAdminV1AdminTokensTokenIDRevokeMutationError = ErrorType<ForbiddenResponse | NotFoundResponse>
+
+    /**
+ * @summary Revoke an admin token (invalidated immediately)
+ */
+export const usePostAdminV1AdminTokensTokenIDRevoke = <TError = ErrorType<ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>, TError,{tokenID: string}, TContext>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminV1AdminTokensTokenIDRevoke>>,
+        TError,
+        {tokenID: string},
+        TContext
+      > => {
+
+      const mutationOptions = getPostAdminV1AdminTokensTokenIDRevokeMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

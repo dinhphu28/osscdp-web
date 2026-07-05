@@ -47,6 +47,8 @@ export interface MockSeed {
   segments?: Array<Record<string, unknown>>;
   destinations?: Array<Record<string, unknown>>;
   tenants?: Array<Record<string, unknown>>;
+  /** Admin tokens returned by GET /admin/v1/admin-tokens. */
+  adminTokens?: Array<Record<string, unknown>>;
   /** Audit entries returned by GET .../audit. */
   auditEntries?: Array<Record<string, unknown>>;
   /** Stats object returned by GET .../stats. */
@@ -114,6 +116,9 @@ export async function installMockApi(page: Page, seed: MockSeed = {}): Promise<M
     if (method === 'GET' && path.endsWith('/admin/v1/tenants')) {
       return json(route, 200, { tenants: api.seed.tenants ?? [] });
     }
+    if (method === 'GET' && path.endsWith('/admin/v1/admin-tokens')) {
+      return json(route, 200, { tokens: api.seed.adminTokens ?? [] });
+    }
     if (method === 'GET' && /\/tenants\/[^/]+\/sources$/.test(path)) {
       return json(route, 200, { sources: api.seed.sources ?? [] });
     }
@@ -149,11 +154,17 @@ export async function installMockApi(page: Page, seed: MockSeed = {}): Promise<M
     if (method === 'POST' && /\/sources\/[^/]+\/rotate-key$/.test(path)) {
       return json(route, 200, { api_key: 'cdp_live_ROTATED_zyxwv987654' });
     }
+    if (method === 'POST' && /\/sources\/[^/]+\/disable$/.test(path)) {
+      return json(route, 200, { id: pathId(path, 'disable'), status: 'disabled' });
+    }
 
     // ---- admin tokens ----
     if (method === 'POST' && path.endsWith('/admin/v1/admin-tokens')) {
       const b = (body ?? {}) as { role?: string };
       return json(route, 201, { api_token: 'cdpadm_MINTED_e2e_0001', role: b.role ?? 'VIEWER' });
+    }
+    if (method === 'POST' && /\/admin-tokens\/[^/]+\/revoke$/.test(path)) {
+      return json(route, 200, { id: pathId(path, 'revoke'), status: 'revoked' });
     }
 
     // ---- tenants ----

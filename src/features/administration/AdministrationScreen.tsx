@@ -29,22 +29,26 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { CopyButton } from '@/components/CopyButton';
 import { StatusChip } from '@/components/StatusChip';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type GridColDef } from '@/components/DataTable';
 import { useTenant } from '@/lib/tenant/TenantProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { ROLE_PERMISSIONS, ADMIN_ROLES } from '@/lib/auth/permissions';
 import { relativeTime } from '@/lib/format/datetime';
 import type { Permission } from '@/types';
-import { usePostAdminV1AdminTokens } from '@/lib/api/generated/admin-tokens/admin-tokens';
+import {
+  usePostAdminV1AdminTokens,
+  useGetAdminV1AdminTokens,
+  usePostAdminV1AdminTokensTokenIDRevoke,
+  getGetAdminV1AdminTokensQueryKey,
+} from '@/lib/api/generated/admin-tokens/admin-tokens';
 import {
   usePostAdminV1Tenants,
   useGetAdminV1Tenants,
   getGetAdminV1TenantsQueryKey,
 } from '@/lib/api/generated/tenants-sources/tenants-sources';
-import type { Tenant } from '@/lib/api/generated/model';
+import type { AdminToken, Tenant } from '@/lib/api/generated/model';
 import { PostAdminV1AdminTokensBodyRole } from '@/lib/api/generated/model';
-
-const GAPS_DOC = 'docs/10-backend-gaps-and-caveats.md';
 
 /** Canonical, ordered permission vocabulary for the read-only reference matrix. */
 const ALL_PERMISSIONS: Permission[] = [
@@ -73,12 +77,9 @@ const NON_SUPER_ROLES = ADMIN_ROLES.filter((r) => r !== 'SUPER_ADMIN');
 type SecretState = { label: string; value: string } | null;
 
 /**
- * Administration — access control (mint admin tokens, role/permission reference)
- * and super-admin tenant onboarding.
- *
- * NOTE (backend gaps): there is no list/revoke admin-tokens endpoint, so that
- * surface remains a blocked/TBD state. Minting still works. Tenants are now
- * listable (super-admin only). See docs/10-backend-gaps-and-caveats.md.
+ * Administration — access control (mint, list, and revoke admin tokens, plus a
+ * role/permission reference) and super-admin tenant onboarding. Tenants are
+ * listable (super-admin only).
  */
 export function AdministrationScreen() {
   const { can, isSuperAdmin } = useAuth();
@@ -150,6 +151,7 @@ function MintTokenSection({
   onMinted: (token: string) => void;
 }) {
   const { tenantId } = useTenant();
+  const queryClient = useQueryClient();
   const mintMut = usePostAdminV1AdminTokens();
 
   const roleOptions = isSuperAdmin ? ADMIN_ROLES : NON_SUPER_ROLES;
@@ -186,6 +188,7 @@ function MintTokenSection({
       if (res.api_token) {
         onMinted(res.api_token);
       }
+      await queryClient.invalidateQueries({ queryKey: getGetAdminV1AdminTokensQueryKey() });
       enqueueSnackbar(`Token "${values.name}" minted as ${values.role}`, { variant: 'success' });
       form.reset({
         name: '',
@@ -274,14 +277,136 @@ function MintTokenSection({
             <Typography variant="subtitle1" gutterBottom>
               Existing tokens
             </Typography>
-            <EmptyState
-              title="Token listing unavailable"
-              description={`Listing and revoking admin tokens requires a backend GET/DELETE .../admin-tokens endpoint that does not exist yet (TBD — backend gap). See ${GAPS_DOC}. Minting above still works.`}
-            />
+            <AdminTokensList canWrite={canWrite} />
           </CardContent>
         </Card>
       </Box>
     </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Admin tokens — list + revoke
+// ---------------------------------------------------------------------------
+
+function AdminTokensList({ canWrite }: { canWrite: boolean }) {
+  const { can } = useAuth();
+  const queryClient = useQueryClient();
+  const q = useGetAdminV1AdminTokens({ query: { enabled: can('admin:write') } });
+  const revokeMut = usePostAdminV1AdminTokensTokenIDRevoke();
+
+  const [pending, setPending] = useState<AdminToken | null>(null);
+
+  const onRevoke = async () => {
+    const tokenID = pending?.id;
+    if (!tokenID) return;
+    try {
+      await revokeMut.mutateAsync({ tokenID });
+      await queryClient.invalidateQueries({ queryKey: getGetAdminV1AdminTokensQueryKey() });
+      enqueueSnackbar(`Token "${pending.name ?? tokenID}" revoked`, { variant: 'success' });
+    } catch {
+      enqueueSnackbar('Failed to revoke token', { variant: 'error' });
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const columns: GridColDef<AdminToken>[] = [
+    { field: 'name', headerName: 'Name', flex: 1, minWidth: 140 },
+    { field: 'role', headerName: 'Role', width: 140 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => <StatusChip status={params.row.status ?? ''} />,
+    },
+    {
+      field: 'tenant_id',
+      headerName: 'Tenant',
+      flex: 1,
+      minWidth: 160,
+      sortable: false,
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }} noWrap>
+          {params.row.tenant_id ?? 'all'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 140,
+      renderCell: (params) => relativeTime(params.row.created_at),
+    },
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 90,
+      sortable: false,
+      renderCell: (params) => <CopyButton value={params.row.id ?? ''} title="Copy token ID" />,
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          color="error"
+          disabled={params.row.status !== 'active' || !can('admin:write')}
+          onClick={() => setPending(params.row)}
+        >
+          Revoke
+        </Button>
+      ),
+    },
+  ];
+
+  if (!canWrite) {
+    return (
+      <EmptyState
+        title="Token listing unavailable"
+        description="Listing admin tokens requires admin:write. Ask a SUPER_ADMIN or TENANT_ADMIN."
+      />
+    );
+  }
+
+  if (q.isError) {
+    return <ErrorState message="Failed to load admin tokens." onRetry={() => q.refetch()} />;
+  }
+
+  if (!q.isLoading && (q.data?.tokens?.length ?? 0) === 0) {
+    return (
+      <EmptyState
+        title="No tokens yet"
+        description="Mint a token with the form to see it listed here."
+      />
+    );
+  }
+
+  return (
+    <>
+      <DataTable<AdminToken>
+        columns={columns}
+        rows={q.data?.tokens ?? []}
+        getRowId={(r) => r.id ?? ''}
+        loading={q.isLoading}
+        // Small admin list with a wide (7-column) layout: keep every column —
+        // notably the row Revoke action — mounted rather than column-virtualized.
+        disableVirtualization
+      />
+      <ConfirmDialog
+        open={!!pending}
+        title="Revoke admin token"
+        message="Revoke this token? It stops authenticating immediately and cannot be undone."
+        confirmLabel="Revoke"
+        loading={revokeMut.isPending}
+        onConfirm={onRevoke}
+        onClose={() => setPending(null)}
+      />
+    </>
   );
 }
 

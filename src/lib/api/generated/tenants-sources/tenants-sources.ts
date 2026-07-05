@@ -37,6 +37,7 @@ import type {
   NotFoundResponse,
   PostAdminV1TenantsBody,
   PostAdminV1TenantsTenantIDSourcesBody,
+  PostAdminV1TenantsTenantIDSourcesSourceIDDisable200,
   PostAdminV1TenantsTenantIDSourcesSourceIDRotateKey200,
   SourceCreated,
   Tenant,
@@ -429,6 +430,72 @@ export const usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey = <TError = E
       > => {
 
       const mutationOptions = getPostAdminV1TenantsTenantIDSourcesSourceIDRotateKeyMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Requires `source:write`. Sets the source to `disabled`; because auth
+resolves only active sources, its API key stops authenticating at once.
+
+ * @summary Disable a source (ingest blocked immediately)
+ */
+export const postAdminV1TenantsTenantIDSourcesSourceIDDisable = (
+    tenantID: string,
+    sourceID: string,
+ options?: SecondParameter<typeof apiClient>,signal?: AbortSignal
+) => {
+      
+      
+      return apiClient<PostAdminV1TenantsTenantIDSourcesSourceIDDisable200>(
+      {url: `/admin/v1/tenants/${tenantID}/sources/${sourceID}/disable`, method: 'POST', signal
+    },
+      options);
+    }
+  
+
+
+export const getPostAdminV1TenantsTenantIDSourcesSourceIDDisableMutationOptions = <TError = ErrorType<ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>, TError,{tenantID: string;sourceID: string}, TContext>, request?: SecondParameter<typeof apiClient>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>, TError,{tenantID: string;sourceID: string}, TContext> => {
+
+const mutationKey = ['postAdminV1TenantsTenantIDSourcesSourceIDDisable'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>, {tenantID: string;sourceID: string}> = (props) => {
+          const {tenantID,sourceID} = props ?? {};
+
+          return  postAdminV1TenantsTenantIDSourcesSourceIDDisable(tenantID,sourceID,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminV1TenantsTenantIDSourcesSourceIDDisableMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>>
+    
+    export type PostAdminV1TenantsTenantIDSourcesSourceIDDisableMutationError = ErrorType<ForbiddenResponse | NotFoundResponse>
+
+    /**
+ * @summary Disable a source (ingest blocked immediately)
+ */
+export const usePostAdminV1TenantsTenantIDSourcesSourceIDDisable = <TError = ErrorType<ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>, TError,{tenantID: string;sourceID: string}, TContext>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminV1TenantsTenantIDSourcesSourceIDDisable>>,
+        TError,
+        {tenantID: string;sourceID: string},
+        TContext
+      > => {
+
+      const mutationOptions = getPostAdminV1TenantsTenantIDSourcesSourceIDDisableMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
