@@ -6,11 +6,11 @@ The token-entry screen and the persistent app shell/navigation that hosts every 
 
 ## Purpose
 
-osscdp uses **token-only auth** — there is **NO user login, NO username/password, NO session, NO JWT, NO users table**. The operator pastes a pre-issued **admin Bearer token** on the Connect screen. Once validated and stored, the token authorizes every `/admin/v1/*` request. The App Shell then wraps all tenant-scoped routes with a nav rail, top bar (tenant switcher, connected-as chip, theme toggle, disconnect), breadcrumb, and content `<Outlet>`.
+osscdp uses **token-only auth** — there is **NO user login, NO username/password, NO session, NO JWT, NO users table**. The operator pastes a pre-issued **admin Bearer token** on the Connect screen. Once validated, the console calls `GET /admin/v1/whoami` to resolve the token's role + pinned tenant, then stores the session; the token authorizes every `/admin/v1/*` request. The App Shell then wraps all tenant-scoped routes with a nav rail, top bar (tenant switcher, connected-as chip, theme toggle, disconnect), breadcrumb, and content `<Outlet>`.
 
 Two screens are documented here:
 
-1. **Connect** (`/connect`) — paste token, optional base-URL override, optional role declaration, validate, store, route on.
+1. **Connect** (`/connect`) — paste token, optional base-URL override, validate + `whoami` (role auto-detected; manual role picker only as a `404` fallback), store, route on.
 2. **App Shell** — persistent layout for `/t/:tenantId/*`.
 
 ---
@@ -20,7 +20,7 @@ Two screens are documented here:
 | Route          | Screen                   | Notes                                                                                       |
 | -------------- | ------------------------ | ------------------------------------------------------------------------------------------- |
 | `/`            | Redirect                 | No token → `/connect`. Token present → tenant picker or last-used `/t/:tenantId/dashboard`. |
-| `/connect`     | Connect / token entry    | Paste token, optional role + base-URL override, validate, store.                            |
+| `/connect`     | Connect / token entry    | Paste token, optional base-URL override, validate + `whoami` (role auto-detected; manual pick only on 404), store. |
 | `/t/:tenantId` | App Shell (layout route) | Wraps all feature children with nav rail + top bar + breadcrumb + `<Outlet>`.               |
 
 The App Shell is a React Router **layout route** at `/t/:tenantId`; feature screens render into its `<Outlet>`. See [Data model & types](../07-data-model-and-types.md) and [API integration](../04-api-integration.md) for shared plumbing.
@@ -36,20 +36,21 @@ The App Shell is a React Router **layout route** at `/t/:tenantId`; feature scre
 
 ## API calls used (exact paths)
 
-The console holds **no `whoami`/principal endpoint** — there is no admin route to ask the API for the current token's role/permissions (documented gap; see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)). Validation therefore attempts a **cheap, benign authenticated admin GET** and interprets the HTTP status.
+Validation calls `GET /admin/v1/whoami`, which returns the token's principal (`{ role, tenant_id, is_super_admin }`). This both validates the token and resolves the role + pinned tenant — no manual role declaration needed. If the backend lacks the endpoint (`404`, older build), fall back to a benign authenticated admin GET plus a manual role picker.
 
 | Purpose                             | Method & path                                                                                  | Interpretation                                                                                                                                                                             |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Token validation (super-admin path) | `GET /healthz` then a benign admin GET, e.g. `GET /admin/v1/tenants/{tenantID}/events?limit=1` | `200/202` → token accepted for that tenant; `401` → bad/missing token (reject); `403` → token valid but lacks permission or tenant scope (still a valid token — treat as connected, warn). |
+| Principal / token validation        | `GET /admin/v1/whoami`                                                                          | `200` → `{ role, tenant_id, is_super_admin }`; use `role` for gating, `tenant_id` to pin (nil/super → tenant selection). `401` → bad/missing token (reject). `404` → older backend → fallback path. |
+| Fallback validation (whoami 404)    | `GET /healthz` then a benign admin GET, e.g. `GET /admin/v1/tenants/{tenantID}/events?limit=1` | `200/202` → token accepted; `401` → reject; `403` → valid token, lacks perm/scope (treat as connected, warn). Operator declares role manually.                                            |
 | Liveness (base-URL reachability)    | `GET /healthz`                                                                                 | Confirms the base URL is reachable before probing auth. Unauthenticated.                                                                                                                   |
 | Readiness (optional)                | `GET /readyz`                                                                                  | DB ping; optional secondary check. Unauthenticated.                                                                                                                                        |
 
 Notes:
 
-- `GET /healthz`, `GET /readyz` are **unauthenticated** and only prove the base URL is reachable — they do NOT validate the token. Use them for the base-URL override check.
-- The authenticated probe needs a tenant. For a **non-super** token the operator supplies the pinned tenant UUID; for a **super-admin** token any known tenant UUID works. If no tenant is available yet, the probe may return `403 tenant scope violation` — treat as "token appears valid, tenant unknown" and route to tenant selection.
-- A dedicated "list all tenants" endpoint for super-admin is **TBD — backend gap** (see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)); until it exists, super-admin enters the tenant UUID manually.
-- The ingress `GET /v1/auth/whoami` is for **source API keys**, NOT admin tokens — do NOT call it from the console.
+- `GET /healthz`, `GET /readyz` are **unauthenticated** and only prove the base URL is reachable — they do NOT validate the token.
+- With `whoami`, no tenant is needed to validate. For a **super-admin** token (`is_super_admin: true`, `tenant_id` nil) route to **tenant selection**; for a non-super token pin `tenant_id` from the response.
+- Super-admin tenant selection uses `GET /admin/v1/tenants` (real list); manual UUID entry stays as a fallback.
+- The ingress `GET /v1/auth/whoami` is for **source API keys**, NOT admin tokens — do NOT call it from the console. The admin principal endpoint is `GET /admin/v1/whoami`.
 
 All admin requests carry `Authorization: Bearer <adminToken>`. No refresh, no expiry: `401` = bad/missing token, `403` = missing permission or tenant-scope violation.
 
@@ -69,8 +70,8 @@ All admin requests carry `Authorization: Bearer <adminToken>`. No refresh, no ex
 │  └──────────────────────────────────────────┘  │
 │  ▸ Advanced                                     │
 │    Base URL override  [http://localhost:8080]   │
-│    I am a …  (role select — see note)           │
-│    Tenant UUID (for validation)  [optional]     │
+│    I am a …  (role select — 404 fallback only)  │
+│    Tenant UUID (for fallback validation)  [opt] │
 │                                                │
 │  [ Connect ]        (error alert on 401)        │
 │                                                │
@@ -82,8 +83,8 @@ Components:
 
 - **Token field** — masked (`type=password`) with a show/hide toggle; placeholder hints the `cdpadm_` prefix. The static bootstrap token (backend env `ADMIN_API_TOKEN`) authenticates as `SUPER_ADMIN`; minted tokens use prefix `cdpadm_` and carry a role + tenant.
 - **Base-URL override** (collapsible "Advanced") — defaults to `VITE_API_BASE_URL` (dev `http://localhost:8080`; docker `stack-up` maps `http://localhost:18080`). Persisted alongside the token so all subsequent requests use it.
-- **Role declaration** (select) — because there is **no admin `whoami`**, the operator declares their role so the UI can gate features correctly. Options are the six `AdminRole` values. Include explanatory helper text (below). Default to least-privilege (`VIEWER`) if left unset.
-- **Tenant UUID** (optional) — used only to run the validation probe; also seeds the first tenant for non-super tokens.
+- **Role declaration** (select) — **fallback only.** The role is normally auto-detected from `GET /admin/v1/whoami`; this select appears only when `whoami` returns `404` (older backend). Options are the six `AdminRole` values; default to least-privilege (`VIEWER`) if left unset. Include explanatory helper text (below).
+- **Tenant UUID** (optional) — used only by the fallback validation probe when `whoami` is unavailable; otherwise the pinned tenant comes from the `whoami` response.
 - **Connect button** — disabled while validating; shows inline error alert on `401`.
 - **"Why no login?" helper** — one paragraph explaining token-only auth.
 
@@ -91,9 +92,9 @@ Components:
 
 > osscdp has no user accounts or login. Access is granted by pre-issued **admin Bearer tokens** minted by an administrator (`POST /admin/v1/admin-tokens`). Paste the token you were given; it is stored only in your browser and sent as `Authorization: Bearer …` on every request. There is no session and no password.
 
-**Role-declaration helper copy:**
+**Role-declaration helper copy (fallback only):**
 
-> The API has no way to tell the console which role your token holds, so pick the role your token was minted with. This only controls which buttons/menus the console shows you — the server still enforces the real permissions and will return `403` if you attempt something your token can't do.
+> Your role is detected automatically from the server (`GET /admin/v1/whoami`). This picker only appears if your backend is an older build without that endpoint — then pick the role your token was minted with. It only controls which buttons/menus the console shows you — the server still enforces the real permissions and will return `403` if you attempt something your token can't do.
 
 ### App Shell (`/t/:tenantId`)
 
@@ -109,14 +110,14 @@ Components:
 │ Activation│                                                 │
 │ DLQ       │                                                 │
 │ Admin     │                                                 │
-│ Audit*    │                                                 │
+│ Audit     │                                                 │
 └───────────┴────────────────────────────────────────────────┘
 ```
 
 - **Nav rail** — feature links, each gated by the current role's permissions (hide or disable + tooltip). See mapping below.
 - **Top bar**:
   - **Tenant switcher** — super-admin can change tenant; non-super shows the single pinned tenant (or is hidden). See behavior below.
-  - **Connected-as chip** — displays the declared role, e.g. `connected as MARKETER`.
+  - **Connected-as chip** — displays the `whoami`-resolved role (or the fallback-declared role), e.g. `connected as MARKETER`.
   - **Theme toggle** — light/dark via MUI theme; persist to `localStorage`.
   - **Disconnect** — clears the stored token and routes to `/connect`.
 - **Breadcrumb** — derived from the route (tenant → feature → sub-page).
@@ -134,7 +135,7 @@ Components:
 | Activation     | `/t/:tenantId/destinations`   | `destination:read` / `activation:read`                                                                   |
 | DLQ            | `/t/:tenantId/dlq`            | `dlq:read`                                                                                               |
 | Administration | `/t/:tenantId/administration` | `admin:write` (super-admin also sees Tenants)                                                            |
-| Audit*         | `/t/:tenantId/audit`          | `audit:read` — **Phase 2 / backend gap** (no read endpoint yet; show "requires backend endpoint" banner) |
+| Audit          | `/t/:tenantId/audit`          | `audit:read` — **live** keyset table (`GET .../audit`, metadata-only)                                     |
 
 ---
 
@@ -169,12 +170,13 @@ export interface ApiError {
   error: { code: string; message: string };
 }
 
-// Client-only auth session (persisted to localStorage; never from the API)
+// Client-only auth session (persisted to localStorage; role/tenant seeded from GET /admin/v1/whoami)
 export interface AdminSession {
   token: string; // pasted admin Bearer token (cdpadm_… or bootstrap)
   baseUrl: string; // resolved base URL (override or VITE_API_BASE_URL)
-  declaredRole: AdminRole; // operator-declared, since there is no whoami
-  tenantId?: string; // pinned tenant for non-super tokens; undefined for super-admin until picked
+  role: AdminRole; // from whoami; falls back to a manual pick only on whoami 404
+  isSuperAdmin?: boolean; // from whoami.is_super_admin
+  tenantId?: string; // from whoami.tenant_id; undefined for super-admin until picked
 }
 ```
 
@@ -228,26 +230,36 @@ export function permsForRole(role: AdminRole): Set<Permission> {
 - The Axios request interceptor reads `token` + `baseUrl` from the store and injects `Authorization: Bearer <token>`; a `tenantPath(tenantId, suffix)` helper builds `/admin/v1/tenants/${tenantId}${suffix}`. See [API integration](../04-api-integration.md).
 
 ```tsx
-// Connect submit (React Hook Form + Zod): validate then store then route
+// Connect submit (React Hook Form + Zod): validate via whoami, then store, then route
 async function onConnect(values: ConnectForm) {
   const base = values.baseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
   await axios.get(`${base}/healthz`); // base URL reachable?
+  const auth = { headers: { Authorization: `Bearer ${values.token}` } };
   try {
-    await axios.get(`${base}/admin/v1/tenants/${values.tenantId}/events`, {
-      params: { limit: 1 },
-      headers: { Authorization: `Bearer ${values.token}` },
+    // Primary path: resolve role + tenant from the admin principal endpoint.
+    const { data } = await axios.get(`${base}/admin/v1/whoami`, auth); // { role, tenant_id, is_super_admin }
+    setSession({
+      token: values.token,
+      baseUrl: base,
+      role: data.role,
+      isSuperAdmin: data.is_super_admin,
+      tenantId: data.tenant_id ?? undefined,
     });
+    navigate(data.tenant_id ? `/t/${data.tenant_id}/dashboard` : '/'); // '/' → tenant picker (super-admin)
+    return;
+  } catch (e) {
+    if (isStatus(e, 401)) throw new Error('Invalid admin token (401).');
+    if (!isStatus(e, 404)) throw e; // 404 = older backend without whoami → fallback below
+  }
+  // Fallback (whoami 404): benign probe + manually-declared role.
+  try {
+    await axios.get(`${base}/admin/v1/tenants/${values.tenantId}/events`, { params: { limit: 1 }, ...auth });
   } catch (e) {
     if (isStatus(e, 401)) throw new Error('Invalid admin token (401).');
     if (!isStatus(e, 403)) throw e; // 403 = valid token, no perm/scope → still connected
   }
-  setSession({
-    token: values.token,
-    baseUrl: base,
-    declaredRole: values.role,
-    tenantId: values.tenantId,
-  });
-  navigate(values.tenantId ? `/t/${values.tenantId}/dashboard` : '/'); // '/' → tenant picker
+  setSession({ token: values.token, baseUrl: base, role: values.role, tenantId: values.tenantId });
+  navigate(values.tenantId ? `/t/${values.tenantId}/dashboard` : '/');
 }
 ```
 
@@ -258,7 +270,7 @@ async function onConnect(values: ConnectForm) {
 ### Connect screen
 
 - **Idle** — form ready; Connect enabled once a token is present.
-- **Validating** — Connect disabled + spinner while `GET /healthz` and the benign admin probe run.
+- **Validating** — Connect disabled + spinner while `GET /healthz` and `GET /admin/v1/whoami` run (or the fallback probe when `whoami` 404s).
 - **Error — base URL unreachable** — network error / no `2xx` from `/healthz`: inline alert "Cannot reach API at `<baseUrl>` — check the base URL and that CORS allows this origin." (Backend must set `CORS_ALLOWED_ORIGINS` to the console origin; allowed headers include `Authorization, Content-Type, Accept, X-Api-Key`.)
 - **Error — 401** — inline alert "Invalid or missing admin token (401)." Do NOT store the token.
 - **Warn — 403** — token accepted but the probe lacked permission/scope: proceed to connected state, but surface a non-blocking toast "Token valid, but this action was forbidden (403) — some features may be hidden."
@@ -305,7 +317,7 @@ api.interceptors.response.use(
 
 ### Tenant switcher behavior
 
-- **Super-admin** (`SUPER_ADMIN`, token tenant = nil): can access any tenant. Switcher allows **manual tenant UUID entry**. A picklist of tenants is **TBD — backend gap** (no confirmed "list all tenants" endpoint; see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)) — render manual UUID entry now, upgrade to a list when the endpoint exists.
+- **Super-admin** (`SUPER_ADMIN`, `is_super_admin: true`, token tenant = nil): can access any tenant. The switcher / SelectTenant renders a **real tenant picklist** from `GET /admin/v1/tenants`; manual tenant UUID entry is kept as a fallback.
 - **Non-super** (`TENANT_ADMIN`, `MARKETER`, `ANALYST`, `OPERATOR`, `VIEWER`): pinned to a single tenant. The switcher shows only that tenant (read-only) or is hidden entirely. Attempting another tenant would yield `403 tenant scope violation`.
 - The tenant is always the `{tenantID}` **URL path segment** — never sent in body or header. A `TenantProvider` holds the current tenant; the Axios layer injects it into admin paths.
 
@@ -313,8 +325,8 @@ api.interceptors.response.use(
 
 ## RBAC & PII notes
 
-- **RBAC:** the shell computes the current role's permission set from the role→permission table (declared role, since there is no `whoami`) and gates nav items and actions via `<RequirePerm>`. Disabled actions carry a tooltip "requires `<perm>`". Server-side `403` remains the real enforcement — UI gating is UX only.
-- **Declared-role caveat:** the declared role may not match the token's true role. If the operator over-declares (e.g. picks `TENANT_ADMIN` for a `VIEWER` token), extra buttons will appear but their requests will return `403`; the interceptor surfaces this as a toast. Default unknown/unset to least-privilege (`VIEWER`).
+- **RBAC:** the shell computes the current role's permission set from the role→permission table (role resolved from `GET /admin/v1/whoami`) and gates nav items and actions via `<RequirePerm>`. Disabled actions carry a tooltip "requires `<perm>`". Server-side `403` remains the real enforcement — UI gating is UX only.
+- **Fallback-role caveat (whoami 404 only):** when the role is manually declared (older backend), it may not match the token's true role. If the operator over-declares (e.g. picks `TENANT_ADMIN` for a `VIEWER` token), extra buttons will appear but their requests will return `403`; the interceptor surfaces this as a toast. Default unknown/unset to least-privilege (`VIEWER`).
 - **PII:** the shell renders no customer PII itself. PII masking is entirely server-side — traits (email/phone/name) come back masked (`u***@x.com`, `+8490****567`, `N***`) unless the token holds `pii:read`. The console never attempts client-side unmasking. (Relevant to feature screens, not the shell chrome.)
 - **Token handling:** the admin token is a secret — store in `localStorage` only, never log it, never place it in a cookie (`AllowCredentials: false`), and mask it in the input field.
 
@@ -325,16 +337,16 @@ api.interceptors.response.use(
 - [ ] `/connect` renders a **paste-token** flow (masked field, show/hide) — **no username/password fields** anywhere.
 - [ ] A "why no login?" helper explains token-only auth.
 - [ ] "Advanced" reveals a **base-URL override** defaulting to `VITE_API_BASE_URL` (dev `http://localhost:8080`; docker `http://localhost:18080`), persisted with the session.
-- [ ] A **role-declaration** select (six `AdminRole` values) with helper text explaining it exists because there is no admin `whoami`; unset defaults to least-privilege `VIEWER`.
-- [ ] Connect **validates** the token via `GET /healthz` (base reachable) then a benign authenticated admin GET; `401` blocks and shows an inline error without storing the token.
-- [ ] `403` during validation is treated as a **valid token** (stored) with a non-blocking warning.
+- [ ] Connect **validates** the token via `GET /healthz` (base reachable) then `GET /admin/v1/whoami`; the response `{ role, tenant_id, is_super_admin }` seeds the session (role auto-detected). `401` blocks and shows an inline error without storing the token.
+- [ ] A **role-declaration** select (six `AdminRole` values) is shown **only as a fallback** when `whoami` returns `404`; helper text explains it; unset defaults to least-privilege `VIEWER`.
+- [ ] In the fallback path a `403` during the benign probe is treated as a **valid token** (stored) with a non-blocking warning.
 - [ ] On success the token is stored in `localStorage` (never a cookie) and the user is routed to **tenant selection** or `/t/:tenantId/dashboard`.
 - [ ] `/` redirects to `/connect` when no token is stored; otherwise to tenant picker / last tenant.
 - [ ] App Shell renders **nav rail** (perm-gated links), **top bar** (tenant switcher, connected-as-`<role>` chip, theme toggle, disconnect), **breadcrumb**, and content **`<Outlet>`**.
-- [ ] Nav links are hidden/disabled per the **role→permission table** computed from the declared role; disabled actions show a "requires `<perm>`" tooltip.
-- [ ] **Tenant switcher**: super-admin can enter a tenant UUID manually (list endpoint marked TBD — backend gap); non-super is pinned to one tenant (switcher read-only or hidden).
+- [ ] Nav links are hidden/disabled per the **role→permission table** computed from the `whoami`-resolved role; disabled actions show a "requires `<perm>`" tooltip.
+- [ ] **Tenant switcher**: super-admin picks from a real tenant list (`GET /admin/v1/tenants`, manual UUID entry as fallback); non-super is pinned to one tenant (switcher read-only or hidden).
 - [ ] **Theme toggle** switches light/dark and persists to `localStorage`.
 - [ ] **Disconnect** clears the stored token/session and routes to `/connect` (with a confirm dialog).
 - [ ] Any admin request returning **`401` auto-redirects** to `/connect` and clears the token; `403` shows a toast; `429` respects `Retry-After`.
-- [ ] The admin token travels only in the `Authorization: Bearer` header; the app never calls ingress `GET /v1/auth/whoami` from the console.
-- [ ] The **Audit** nav item is present but marked Phase 2 / backend gap (see [Backend gaps & caveats](../10-backend-gaps-and-caveats.md)).
+- [ ] The admin token travels only in the `Authorization: Bearer` header; validation uses the admin `GET /admin/v1/whoami`, never the ingress `GET /v1/auth/whoami`.
+- [ ] The **Audit** nav item links to the live audit table (`GET .../audit`, metadata-only — see [Audit log](10-audit-log.md)).

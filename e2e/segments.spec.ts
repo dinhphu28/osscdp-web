@@ -13,12 +13,12 @@ test('segments: build a rule and create a segment', async ({ page }) => {
   const mock = await installMockApi(page);
 
   // 1. Connect → Dashboard, then navigate to Segments.
-  await connect(page);
+  await connect(page, mock);
   await page.getByRole('link', { name: 'Segments' }).click();
-  await expect(page.getByRole('heading', { name: 'Segments' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Segments', exact: true })).toBeVisible();
 
   // 2. Open the new-segment editor via the "Create segment" action (a RouterLink).
-  await page.getByRole('link', { name: 'Create segment' }).click();
+  await page.getByRole('link', { name: 'Create segment' }).first().click();
   await expect(page).toHaveURL(new RegExp(`/t/${TEST_TENANT}/segments/new`));
   await expect(page.getByRole('heading', { name: 'New segment' })).toBeVisible();
 
@@ -30,7 +30,9 @@ test('segments: build a rule and create a segment', async ({ page }) => {
   await page.getByRole('button', { name: 'Create segment' }).click();
   await expect(page.getByText('Every condition needs a field', { exact: true })).toBeVisible();
   // Nothing should have been POSTed yet.
-  expect(mock.requests.find((r) => r.method === 'POST' && r.path.endsWith('/segments'))).toBeUndefined();
+  expect(
+    mock.requests.find((r) => r.method === 'POST' && r.path.endsWith('/segments')),
+  ).toBeUndefined();
 
   // 5. Drive the RuleBuilder leaf to a valid, non-wildcard single comparison:
   //    field = profile.canonical_user_id, op = eq (default), value = customer_e2e.

@@ -25,7 +25,7 @@ test('DLQ triage: list, retry, discard', async ({ page }) => {
   });
 
   // 1. Connect → Dashboard (default SUPER_ADMIN role can dlq:retry).
-  await connect(page);
+  await connect(page, mock);
 
   // 2. Navigate to DLQ.
   await page.getByRole('link', { name: 'DLQ' }).click();

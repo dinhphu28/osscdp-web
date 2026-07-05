@@ -4,6 +4,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { enqueueSnackbar } from 'notistack';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Accordion,
   AccordionDetails,
@@ -23,12 +24,25 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMoreOutlined';
 import AddIcon from '@mui/icons-material/AddOutlined';
 import DeleteIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import LaunchIcon from '@mui/icons-material/LaunchOutlined';
 import { PageHeader } from '@/components/PageHeader';
 import { OneTimeSecretDialog } from '@/components/OneTimeSecretDialog';
+import { DataTable, type GridColDef } from '@/components/DataTable';
+import { StatusChip } from '@/components/StatusChip';
+import { CopyButton } from '@/components/CopyButton';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { useTenant } from '@/lib/tenant/TenantProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { usePostAdminV1TenantsTenantIDDestinations } from '@/lib/api/generated/destinations/destinations';
-import type { PostAdminV1TenantsTenantIDDestinationsBody } from '@/lib/api/generated/model';
+import {
+  getGetAdminV1TenantsTenantIDDestinationsQueryKey,
+  useGetAdminV1TenantsTenantIDDestinations,
+  usePostAdminV1TenantsTenantIDDestinations,
+} from '@/lib/api/generated/destinations/destinations';
+import type {
+  Destination,
+  PostAdminV1TenantsTenantIDDestinationsBody,
+} from '@/lib/api/generated/model';
 
 /** Destination types the backend actually implements today; the rest are declared-but-deferred. */
 const TYPE_OPTIONS: { value: string; label: string; enabled: boolean }[] = [
@@ -76,21 +90,66 @@ const createSchema = z
 type CreateForm = z.infer<typeof createSchema>;
 
 /**
- * Activation / Destinations — create a destination (webhook or kafka) and open an existing one by ID.
- * NOTE (backend gap): there is no list-destinations endpoint, so this screen provides
- * create + open-by-ID rather than a table. See docs/screens/07-activation-destinations.md and
- * docs/10-backend-gaps-and-caveats.md.
+ * Activation / Destinations — list existing destinations, create one (webhook or kafka),
+ * and open one by ID. See docs/screens/07-activation-destinations.md.
  */
 export function DestinationsScreen() {
   const { tenantId } = useTenant();
   const { can } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const canWrite = can('destination:write');
 
   const [openId, setOpenId] = useState('');
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
 
+  const listQuery = useGetAdminV1TenantsTenantIDDestinations(tenantId);
   const createMut = usePostAdminV1TenantsTenantIDDestinations();
+
+  const columns: GridColDef<Destination>[] = [
+    { field: 'name', headerName: 'Name', flex: 1, minWidth: 180 },
+    { field: 'type', headerName: 'Type', width: 120 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (params) => (params.row.status ? <StatusChip status={params.row.status} /> : '—'),
+    },
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 170,
+      sortable: false,
+      renderCell: (params) =>
+        params.row.id ? (
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography variant="body2" noWrap sx={{ fontFamily: 'monospace' }}>
+              {params.row.id}
+            </Typography>
+            <CopyButton value={params.row.id} title="Copy destination ID" />
+          </Stack>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 80,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <IconButton
+          aria-label="Open destination"
+          size="small"
+          disabled={!params.row.id}
+          onClick={() => navigate(`/t/${tenantId}/destinations/${params.row.id}`)}
+        >
+          <LaunchIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
 
   const form = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -140,6 +199,9 @@ export function DestinationsScreen() {
 
     try {
       const res = await createMut.mutateAsync({ tenantID: tenantId, data: body });
+      queryClient.invalidateQueries({
+        queryKey: getGetAdminV1TenantsTenantIDDestinationsQueryKey(tenantId),
+      });
       // The create response does NOT return the secret today (write-only, encrypted at rest).
       // Guard defensively in case the backend ever surfaces it once.
       const returnedSecret = (res as { secret?: string }).secret;
@@ -174,11 +236,23 @@ export function DestinationsScreen() {
         </Alert>
       )}
 
-      <Alert severity="warning" sx={{ mb: 3 }}>
-        The backend has no list-destinations endpoint yet, so existing destinations can't be shown
-        as a table. Open one by its ID below, or reach it from a segment's destinations. (See
-        docs/10-backend-gaps-and-caveats.md.)
-      </Alert>
+      <Box sx={{ mb: 3 }}>
+        {listQuery.isError ? (
+          <ErrorState message="Failed to load destinations." onRetry={() => listQuery.refetch()} />
+        ) : !listQuery.isLoading && (listQuery.data?.destinations?.length ?? 0) === 0 ? (
+          <EmptyState
+            title="No destinations yet"
+            description="Create your first activation destination below."
+          />
+        ) : (
+          <DataTable<Destination>
+            rows={listQuery.data?.destinations ?? []}
+            columns={columns}
+            getRowId={(row) => row.id ?? ''}
+            loading={listQuery.isLoading}
+          />
+        )}
+      </Box>
 
       <Box
         sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, mb: 3 }}

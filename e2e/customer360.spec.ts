@@ -21,7 +21,7 @@ test('customer 360: overview, consent write, gdpr delete', async ({ page }) => {
   });
 
   // 1. Connect (SUPER_ADMIN → holds pii:read, consent:write, profile:delete).
-  await connect(page);
+  await connect(page, mock);
 
   // 2. Navigate straight to the customer detail.
   await page.goto(`/t/${TEST_TENANT}/profiles/customer_e2e_1`);

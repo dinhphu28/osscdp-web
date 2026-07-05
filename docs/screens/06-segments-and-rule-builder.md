@@ -38,14 +38,14 @@ All paths are admin routes: `Authorization: Bearer <adminToken>`, permission-gat
 | `GET`    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}`              | `segment:read`     | Segment detail (incl. current version / rule)                                                                                                                                                               |
 | `GET`    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/members`      | `segment:read`     | Active members, **no paging params** — full array                                                                                                                                                           |
 | `GET`    | `/admin/v1/tenants/{tenantID}/segments/{segmentID}/destinations` | `destination:read` | Destinations wired to this segment                                                                                                                                                                          |
-| `GET`    | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:read`     | **TBD — backend gap.** List-all-segments endpoint is NOT confirmed in the spec extract; the list screen needs it. Assume `GET .../segments` and flag. See [Backend gaps](../10-backend-gaps-and-caveats.md) |
+| `GET`    | `/admin/v1/tenants/{tenantID}/segments`                          | `segment:read`     | **List all segments** — real list table (full array, client-mode paging). Open-by-ID remains a secondary path.                                                                                              |
 
 ## Layout & components
 
 ### Segment list (`/segments`)
 
 - **PageHeader**: title "Segments", primary action **New segment** (gated `<RequirePerm perm="segment:write">`, links to `/segments/new`).
-- **MUI X Data Grid**, client-mode paging (the list endpoint has no paging params; also TBD — backend gap). Columns: `name` (link to detail), `status` via **StatusChip**, `description`, `current_version_id` (copyable), row actions (Edit, Deactivate).
+- **MUI X Data Grid**, client-mode paging (the `GET .../segments` list returns a full array, no paging params). Columns: `name` (link to detail), `status` via **StatusChip**, `description`, `current_version_id` (copyable), row actions (Edit, Deactivate).
 - Loading skeletons; **EmptyState** ("No segments yet — create your first audience"); **ErrorState** with retry.
 
 ### Create / edit (`/segments/new`, `/segments/:segmentId`)
@@ -304,7 +304,7 @@ On success, invalidate the relevant TanStack Query keys (segment list, this segm
 
 ## Acceptance criteria (checklist)
 
-- [ ] Segment list renders via `GET .../segments` (**TBD — backend gap**, flagged); New-segment CTA gated by `segment:write`.
+- [ ] Segment list renders as a real table via `GET .../segments` (open-by-ID secondary); New-segment CTA gated by `segment:write`.
 - [ ] Create posts `{name, description?, rule}` to `POST .../segments`; success shows async-processing notice.
 - [ ] Edit uses `PUT .../segments/{segmentID}` and the UI states that editing **creates a new version**.
 - [ ] Deactivate uses `DELETE .../segments/{segmentID}` behind a ConfirmDialog and is documented as CODE-ONLY (not in openapi.yaml, hand-add to client).

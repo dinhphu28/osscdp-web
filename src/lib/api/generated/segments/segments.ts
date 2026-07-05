@@ -32,6 +32,8 @@ import type {
 import type {
   BadRequestResponse,
   ConflictResponse,
+  ForbiddenResponse,
+  GetAdminV1TenantsTenantIDSegments200,
   GetAdminV1TenantsTenantIDSegmentsSegmentIDDestinations200,
   GetAdminV1TenantsTenantIDSegmentsSegmentIDMembers200,
   NotFoundResponse,
@@ -45,6 +47,99 @@ import type { ErrorType , BodyType } from '../../axios';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+/**
+ * Requires `segment:read`. Each segment carries its current rule version.
+ * @summary List a tenant's segments
+ */
+export const getAdminV1TenantsTenantIDSegments = (
+    tenantID: string,
+ options?: SecondParameter<typeof apiClient>,signal?: AbortSignal
+) => {
+      
+      
+      return apiClient<GetAdminV1TenantsTenantIDSegments200>(
+      {url: `/admin/v1/tenants/${tenantID}/segments`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetAdminV1TenantsTenantIDSegmentsQueryKey = (tenantID?: string,) => {
+    return [
+    `/admin/v1/tenants/${tenantID}/segments`
+    ] as const;
+    }
+
+    
+export const getGetAdminV1TenantsTenantIDSegmentsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError = ErrorType<ForbiddenResponse>>(tenantID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminV1TenantsTenantIDSegmentsQueryKey(tenantID);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>> = ({ signal }) => getAdminV1TenantsTenantIDSegments(tenantID, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(tenantID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminV1TenantsTenantIDSegmentsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>>
+export type GetAdminV1TenantsTenantIDSegmentsQueryError = ErrorType<ForbiddenResponse>
+
+
+export function useGetAdminV1TenantsTenantIDSegments<TData = Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError = ErrorType<ForbiddenResponse>>(
+ tenantID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminV1TenantsTenantIDSegments<TData = Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError = ErrorType<ForbiddenResponse>>(
+ tenantID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminV1TenantsTenantIDSegments<TData = Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError = ErrorType<ForbiddenResponse>>(
+ tenantID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List a tenant's segments
+ */
+
+export function useGetAdminV1TenantsTenantIDSegments<TData = Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError = ErrorType<ForbiddenResponse>>(
+ tenantID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminV1TenantsTenantIDSegments>>, TError, TData>>, request?: SecondParameter<typeof apiClient>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminV1TenantsTenantIDSegmentsQueryOptions(tenantID,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
 
 
 

@@ -7,12 +7,12 @@ At-a-glance health and operability overview for the currently selected tenant.
 The Dashboard is the landing screen after a tenant is selected. It answers two operator
 questions fast: **"Is the platform healthy right now?"** and **"What is the state of my CDP
 for this tenant?"** It surfaces liveness/readiness, a small set of operability cards (DLQ
-backlog, activation success, processing lag, segment/source counts), and permission-gated
-quick actions.
+backlog, activation success, processing lag, segment/source/destination/profile counts), and
+permission-gated quick actions.
 
-Be honest about data availability: some numbers are readily computed from admin endpoints,
-others are **only in Prometheus/Grafana** and cannot be rendered as JSON gauges today. See
-[Backend gaps and caveats](../10-backend-gaps-and-caveats.md).
+Be honest about data availability: counts are **real JSON** from `GET .../stats`; time-series
+(processing lag, ingest rate) is **only in Prometheus/Grafana** and cannot be rendered as JSON
+gauges today. See [Backend gaps and caveats](../10-backend-gaps-and-caveats.md).
 
 ## Route(s)
 
@@ -29,18 +29,16 @@ permission hides (not errors) the corresponding card.
 | Card / element                       | Permission                                  | If missing                                 |
 | ------------------------------------ | ------------------------------------------- | ------------------------------------------ |
 | Health strip (`/healthz`, `/readyz`) | none (unauthenticated meta)                 | always shown                               |
-| DLQ open count                       | `dlq:read`                                  | hide card                                  |
+| Counts (DLQ open, sources, segments, destinations, profiles) | read (any read-set perm) via `GET .../stats` | show `—` for an unavailable count          |
 | Activation success rate              | `activation:read`                           | hide card                                  |
-| Segment count                        | `segment:read`                              | hide card                                  |
-| Source count                         | `source:read`                               | hide card                                  |
-| Processing lag / metrics             | none (Grafana link) or backend gap for JSON | show Grafana link                          |
+| Processing lag / time-series metrics | none (Grafana link) — backend gap for JSON  | show Grafana link                          |
 | Quick action: create source          | `source:write`                              | disable (tooltip "requires source:write")  |
 | Quick action: look up profile        | `profile:read`                              | disable (tooltip "requires profile:read")  |
 | Quick action: create segment         | `segment:write`                             | disable (tooltip "requires segment:write") |
 
-Role → permission gating is computed client-side from the canonical role→perm table (there is
-**no admin whoami endpoint**). See [Auth & RBAC](../05-auth-rbac-tenancy.md) and
-[Backend gaps](../10-backend-gaps-and-caveats.md#no-admin-whoami).
+Role → permission gating is computed client-side from the canonical role→perm table (role resolved
+from `GET /admin/v1/whoami`). See [Auth & RBAC](../05-auth-rbac-tenancy.md) and
+[Backend gaps](../10-backend-gaps-and-caveats.md).
 
 ## API calls used (exact paths)
 
@@ -56,45 +54,40 @@ Role → permission gating is computed client-side from the canonical role→per
 
 | Method | Path                                                                   | Permission        | Feeds card                                                          |
 | ------ | ---------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------- |
-| `GET`  | `/admin/v1/tenants/{tenantID}/dlq?status=open`                         | `dlq:read`        | DLQ open count (`events.length`)                                    |
-| `GET`  | `/admin/v1/tenants/{tenantID}/segments`                                | `segment:read`    | Segment count — **TBD**, list endpoint unconfirmed                  |
-| `GET`  | `/admin/v1/tenants/{tenantID}/sources`                                 | `source:read`     | Source count — **TBD**, list endpoint unconfirmed                   |
+| `GET`  | `/admin/v1/tenants/{tenantID}/stats`                                   | read set          | Counts: `dlq_open`, `sources`, `segments`, `destinations`, `profiles` |
+| `GET`  | `/admin/v1/tenants/{tenantID}/dlq?status=open`                         | `dlq:read`        | DLQ open count (alternative to `stats.dlq_open`)                    |
 | `GET`  | `/admin/v1/tenants/{tenantID}/destinations/{destinationID}/deliveries` | `activation:read` | Activation success rate (per-destination; aggregate is approximate) |
 
-> **TBD — backend gap:** the spec extract confirms no "list all segments" and no "list all
-> sources" endpoint. Segment/source count cards depend on `GET .../segments` and
-> `GET .../sources` existing. Mark these cards "TBD — confirm list endpoint" and render an
-> "unavailable" state until confirmed. See
-> [Backend gaps](../10-backend-gaps-and-caveats.md#no-segment-list) and
-> [API integration](../04-api-integration.md).
+> **Counts come from `GET .../stats`** — a single JSON call returning
+> `{ dlq_open, sources, segments, destinations, profiles }`. Render each as a real number; show
+> `—` when a count is unavailable or `-1`. (The DLQ open count can also be derived from
+> `GET .../dlq?status=open`.) See [API integration](../04-api-integration.md).
 
 ## Metrics reality (read this before building gauges)
 
 `GET /metrics` returns **Prometheus exposition text, not JSON**. The frontend must NOT scrape
-and parse it. Two supported approaches — **default to Grafana + a few computed cards**:
+and parse it. **Counts** are now covered by `GET .../stats` (JSON); only **time-series** stays in
+Prometheus/Grafana:
 
-1. **Default — link/embed Grafana.** The docker `stack-up` runs Grafana on `:3000`. Render a
+1. **Counts — `GET .../stats`.** Render `dlq_open`, `sources`, `segments`, `destinations`, and
+   `profiles` directly as cards (`—` when unavailable / `-1`).
+2. **Time-series — link/embed Grafana.** The docker `stack-up` runs Grafana on `:3000`. Render a
    "Open metrics dashboard" button/`<iframe>` to Grafana. Processing lag, ingest rate,
-   `events_rate_limited`, and `activation_circuit_open_total` live here.
-2. **JSON gauges (blocked).** Rendering in-app gauges (Recharts / MUI X Charts) requires a
-   **JSON metrics endpoint that does not exist today** (would need a backend scrape-and-parse
-   endpoint). Mark as **TBD — backend gap**; see
-   [Backend gaps](../10-backend-gaps-and-caveats.md#metrics-prometheus-text).
-
-Where a number IS cheaply available from an admin endpoint (DLQ open count, counts,
-delivery-derived success rate), render it as a card. Everything time-series/lag → Grafana.
+   `events_rate_limited`, and `activation_circuit_open_total` live here — NOT in `/stats`.
+3. **JSON time-series gauges (blocked).** In-app lag gauges (Recharts / MUI X Charts) would need a
+   **JSON time-series metrics endpoint that does not exist today**. Mark as **TBD — backend gap**;
+   see [Backend gaps](../10-backend-gaps-and-caveats.md).
 
 ## Layout & components
 
 ```
 PageHeader ("Dashboard", tenant name, refresh button)
 ├─ HealthStrip        (healthz / readyz StatusChips + Grafana link)
-├─ CardsRow (MUI Grid of MetricCard)
-│    ├─ DLQ open count            (dlq:read)      → link to /t/:tenantId/dlq?status=open
+├─ CardsRow (MUI Grid of MetricCard) — counts from GET .../stats
+│    ├─ DLQ open count            (stats.dlq_open) → link to /t/:tenantId/dlq?status=open
+│    ├─ Source / Segment / Destination / Profile counts (stats.*, "—" if unavailable)
 │    ├─ Activation success rate   (activation:read, approximate)
-│    ├─ Processing lag            (Grafana link / TBD gauge)
-│    ├─ Segment count             (segment:read, TBD endpoint)
-│    └─ Source count              (source:read, TBD endpoint)
+│    └─ Processing lag            (Grafana link / TBD gauge)
 └─ QuickActions (RequirePerm-wrapped buttons)
 ```
 
@@ -145,14 +138,12 @@ not redefine.
 
 | Card               | Source shape                                                              |
 | ------------------ | ------------------------------------------------------------------------- |
-| DLQ open count     | `{ events: DlqEvent[] }` → `events.length`                                |
+| Counts             | `{ dlq_open, sources, segments, destinations, profiles }` from `GET .../stats` (numbers; `-1`/absent → render `—`) |
 | Activation success | `DeliveryLog[]` (fields: `status: ActivationTaskStatus`, `attempt_count`) |
-| Segment count      | `Segment[]` (TBD list endpoint)                                           |
-| Source count       | `Source[]` (TBD list endpoint)                                            |
 | Health             | plain `200` OK / non-200; no body needed                                  |
 
-`DlqStatus = 'open' | 'retried' | 'discarded'`. The DLQ open-count query MUST use
-`?status=open` verbatim.
+`DlqStatus = 'open' | 'retried' | 'discarded'`. If deriving the DLQ open count from the DLQ list
+instead of `stats.dlq_open`, the query MUST use `?status=open` verbatim.
 
 ## States (loading / empty / error)
 
@@ -162,10 +153,11 @@ Each card manages state independently so one failing card never blanks the page.
 | ------------------- | ----------------------------------------------------------------------------------------- |
 | Loading             | Skeleton inside the card (MUI `Skeleton`); health chips show indeterminate.               |
 | Empty               | Zero is a valid value: DLQ open `0` → green "no backlog"; counts `0` → "None yet".        |
+| Count unavailable   | A `stats` field that is absent or `-1` renders as `—` (not an error).                     |
 | Error               | `ErrorState` inside the card with a retry button; other cards keep rendering.             |
 | Not ready           | `/readyz` non-200 → red readiness chip + banner "Backend not ready (DB)".                 |
 | Permission-missing  | Card is **hidden** (not an error) when the role lacks the read perm.                      |
-| Metrics unavailable | Processing-lag/gauge cards show "View in Grafana" or "TBD — needs JSON metrics endpoint". |
+| Metrics unavailable | Processing-lag/time-series cards show "View in Grafana" or "TBD — needs JSON metrics endpoint". |
 
 ## Actions & confirmations
 
@@ -212,14 +204,13 @@ button with tooltip "requires `<perm>`".
 - [ ] Route `/t/:tenantId/dashboard` renders as the default post-tenant-selection landing.
 - [ ] Health strip calls `GET /healthz` and `GET /readyz`; green when 200, red/error otherwise;
       `/readyz` non-200 shows a "backend not ready" banner.
-- [ ] DLQ open-count card calls `GET /admin/v1/tenants/{tenantID}/dlq?status=open` and shows
-      `events.length`; `0` renders as a healthy "no backlog" state; links to the DLQ screen.
+- [ ] Count cards (DLQ open, sources, segments, destinations, profiles) read `GET .../stats`
+      and show real numbers; `dlq_open` `0` renders as a healthy "no backlog" state and links to
+      the DLQ screen; an absent/`-1` count renders as `—`.
 - [ ] Activation success card computes an **approximate, per-destination** rate from
       `DeliveryLog[]` and is explicitly labelled "approx." (no aggregate endpoint — TBD).
-- [ ] Segment-count and source-count cards render, but degrade to a "TBD — confirm list
-      endpoint" state until `GET .../segments` / `GET .../sources` are confirmed.
 - [ ] Processing-lag / time-series metrics are NOT parsed from `/metrics`; the screen links
-      (or embeds) Grafana (`:3000`) instead. JSON gauges flagged "TBD — backend gap".
+      (or embeds) Grafana (`:3000`) instead. JSON time-series gauges flagged "TBD — backend gap".
 - [ ] Each card owns its loading / empty / error state; a single failing card does not blank
       the page.
 - [ ] Cards hide when the role lacks the corresponding read permission (computed client-side).
