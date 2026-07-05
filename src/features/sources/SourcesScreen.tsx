@@ -35,6 +35,7 @@ import {
   getGetAdminV1TenantsTenantIDSourcesQueryKey,
   usePostAdminV1TenantsTenantIDSources,
   usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey,
+  usePostAdminV1TenantsTenantIDSourcesSourceIDDisable,
 } from '@/lib/api/generated/tenants-sources/tenants-sources';
 import type { Source } from '@/lib/api/generated/model/source';
 
@@ -57,10 +58,13 @@ export function SourcesScreen() {
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
   const [rotateId, setRotateId] = useState('');
   const [rotateConfirmOpen, setRotateConfirmOpen] = useState(false);
+  const [disableId, setDisableId] = useState('');
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
 
   const q = useGetAdminV1TenantsTenantIDSources(tenantId);
   const createMut = usePostAdminV1TenantsTenantIDSources();
   const rotateMut = usePostAdminV1TenantsTenantIDSourcesSourceIDRotateKey();
+  const disableMut = usePostAdminV1TenantsTenantIDSourcesSourceIDDisable();
 
   const invalidateSources = () =>
     queryClient.invalidateQueries({
@@ -101,6 +105,20 @@ export function SourcesScreen() {
     }
   };
 
+  const onDisable = async () => {
+    setDisableConfirmOpen(false);
+    try {
+      await disableMut.mutateAsync({ tenantID: tenantId, sourceID: disableId.trim() });
+      enqueueSnackbar('Source disabled — its API key no longer authenticates', {
+        variant: 'success',
+      });
+      setDisableId('');
+      await invalidateSources();
+    } catch {
+      enqueueSnackbar('Failed to disable source', { variant: 'error' });
+    }
+  };
+
   const columns: GridColDef<Source>[] = [
     { field: 'name', headerName: 'Name', flex: 1, minWidth: 160 },
     { field: 'type', headerName: 'Type', width: 120 },
@@ -126,21 +144,37 @@ export function SourcesScreen() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 140,
+      width: 240,
       sortable: false,
       renderCell: (params) => (
-        <Button
-          size="small"
-          variant="outlined"
-          color="warning"
-          disabled={!canWrite || rotateMut.isPending}
-          onClick={() => {
-            setRotateId(String(params.row.id ?? ''));
-            setRotateConfirmOpen(true);
-          }}
-        >
-          Rotate key
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            disabled={!canWrite || rotateMut.isPending}
+            onClick={() => {
+              setRotateId(String(params.row.id ?? ''));
+              setRotateConfirmOpen(true);
+            }}
+          >
+            Rotate key
+          </Button>
+          {params.row.status === 'active' && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              disabled={!canWrite || disableMut.isPending}
+              onClick={() => {
+                setDisableId(String(params.row.id ?? ''));
+                setDisableConfirmOpen(true);
+              }}
+            >
+              Disable
+            </Button>
+          )}
+        </Stack>
       ),
     },
   ];
@@ -282,6 +316,17 @@ export function SourcesScreen() {
         loading={rotateMut.isPending}
         onConfirm={onRotate}
         onClose={() => setRotateConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={disableConfirmOpen}
+        title="Disable this source?"
+        message="Disable this source? Its API key stops authenticating immediately."
+        confirmLabel="Disable"
+        confirmColor="error"
+        loading={disableMut.isPending}
+        onConfirm={onDisable}
+        onClose={() => setDisableConfirmOpen(false)}
       />
     </>
   );
